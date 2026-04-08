@@ -1,0 +1,2591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Lease-CAP: Liveness-Bound Capabilities for Decentralized Authorization</title>
+  <script src="https://www.w3.org/Tools/respec/respec-w3c" class="remove" defer></script>
+  <script class="remove">
+    var respecConfig = {
+      specStatus: "CG-DRAFT",
+      latestVersion: "https://w3id.org/lease-cap/",
+      edDraftURI: "https://github.com/sirrayalabs/lease-cap/spec/",
+      github: "https://github.com/sirrayalabs/lease-cap",
+      shortName: "lease-cap",
+      copyrightStart: "2024",
+      group: "credentials-community-group",
+      editors: [
+        {
+          name: "Amir Hameed Mir",
+          company: "Sirraya Labs",
+          companyURL: "https://sirraya.com",
+          w3cid: ""
+        }
+      ],
+      authors: [
+        {
+          name: "Amir Hameed Mir",
+          company: "Sirraya Labs"
+        }
+      ],
+      formerEditors: [],
+      subjectPrefix: "[lease-cap]",
+      doJsonLd: true,
+      lint: {
+        "no-unused-dfns": false,
+        "check-punctuation": true
+      },
+      localBiblio: {
+        "UCAN": {
+          title: "User Controlled Authorization Networks (UCAN)",
+          href: "https://github.com/ucan-wg/spec/",
+          authors: ["Brooklyn Zelenka", "Alan Shaw", "Irakli Gozalishvili"],
+          status: "Draft",
+          publisher: "UCAN Working Group"
+        },
+        "ZCAP-LD": {
+          title: "ZCAP-LD: Authorization Capabilities for Linked Data",
+          href: "https://w3c-ccg.github.io/zcap-ld/",
+          authors: ["Christopher Lemmer Webber", "Dmitri Zagidulin"],
+          status: "CG-DRAFT",
+          publisher: "W3C Credentials Community Group"
+        },
+        "DIDComm": {
+          title: "DIDComm Messaging Specification",
+          href: "https://identity.foundation/didcomm-messaging/spec/",
+          authors: ["Sam Curren", "Daniel Hardman", "Oliver Terbu"],
+          status: "Specification",
+          publisher: "DIF"
+        },
+        "RFC8785": {
+          title: "JSON Canonicalization Scheme (JCS)",
+          href: "https://www.rfc-editor.org/rfc/rfc8785.html",
+          publisher: "IETF"
+        }
+      },
+      otherLinks: [
+        {
+          key: "Repository",
+          data: [
+            {
+              value: "GitHub Repository",
+              href: "https://github.com/sirrayalabs/lease-cap"
+            },
+            {
+              value: "Issue Tracker",
+              href: "https://github.com/sirrayalabs/lease-cap/issues"
+            }
+          ]
+        },
+        {
+          key: "Implementation",
+          data: [
+            {
+              value: "TypeScript Reference Implementation",
+              href: "https://github.com/sirrayalabs/lease-cap-ts"
+            },
+            {
+              value: "Python Reference Implementation",
+              href: "https://github.com/sirrayalabs/lease-cap-py"
+            }
+          ]
+        }
+      ],
+      maxTocLevel: 3,
+      postProcess: [addCustomStyles]
+    };
+
+    function addCustomStyles() {
+      const style = document.createElement("style");
+      style.textContent = `
+        .state-diagram {
+          font-family: monospace;
+          background: #f5f5f5;
+          padding: 1.5em;
+          border-radius: 8px;
+          overflow-x: auto;
+          line-height: 1.5;
+        }
+        .comparison-table td, .comparison-table th {
+          padding: 0.75em;
+          border: 1px solid #ddd;
+        }
+        .warning {
+          background: #fff3cd;
+          border-left: 4px solid #ffc107;
+          padding: 1em;
+          margin: 1.5em 0;
+          border-radius: 4px;
+        }
+        .note {
+          background: #d1ecf1;
+          border-left: 4px solid #17a2b8;
+          padding: 1em;
+          margin: 1.5em 0;
+          border-radius: 4px;
+        }
+        .test-vector {
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+          padding: 1em;
+          margin: 1.5em 0;
+          font-family: monospace;
+          font-size: 0.9em;
+          overflow-x: auto;
+        }
+        .algorithm {
+          background: #e9ecef;
+          padding: 1.25em;
+          border-radius: 4px;
+          margin: 1.5em 0;
+          font-family: monospace;
+        }
+        .parameter-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 1em 0;
+        }
+        .parameter-table th, .parameter-table td {
+          border: 1px solid #ddd;
+          padding: 10px;
+          text-align: left;
+          vertical-align: top;
+        }
+        .parameter-table th {
+          background-color: #f2f2f2;
+          font-weight: bold;
+        }
+        .protocol-flow {
+          font-family: monospace;
+          background: #f5f5f5;
+          padding: 1em;
+          border-radius: 4px;
+          margin: 1em 0;
+        }
+        dfn {
+          font-weight: bold;
+        }
+        .security-box {
+          background: #fef9e6;
+          border: 1px solid #f0dbaa;
+          padding: 1em;
+          margin: 1em 0;
+          border-radius: 4px;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  </script>
+</head>
+<body>
+  <section id="abstract">
+    <p>Decentralized authorization systems face a fundamental challenge: once a capability is issued, it remains valid indefinitely unless explicitly revoked. In networks where revocation information cannot be reliably propagated — due to partitions, offline operation, or lack of centralized infrastructure — this creates the "zombie capability" problem. Existing solutions either centralize revocation (defeating decentralization) or lack temporal freshness guarantees altogether.</p>
+    
+    <p><strong>Lease-CAP</strong> introduces <strong>Liveness-Bound Capabilities (LBC)</strong> — a novel temporal authorization layer where capabilities decay unless actively maintained through periodic synchronization. Unlike traditional capabilities that remain valid until explicit revocation, LBC requires controllers to regularly prove continued authorization to issuers. This creates a provable <strong>liveness guarantee</strong> for decentralized authorization, solving the zombie capability problem without central revocation services.</p>
+    
+    <p>The specification introduces a <strong>STALE state</strong> — a bounded grace period for renewal that acknowledges network reality while maintaining security boundaries. During this window, verifiers require controllers to synchronize with the issuer before granting access, but do not immediately deny service. This elegant compromise enables seamless operation during temporary network partitions without compromising security.</p>
+    
+    <p>A key architectural insight is the <strong>strict separation</strong> between the static capability credential (which describes <em>what</em> authority is granted) and the dynamic lease state (which captures <em>when</em> the capability was last synchronized). The immutable Verifiable Credential never contains timestamps; instead, an issuer-signed <code>LeaseSyncResponse</code> carries the current <code>lastSync</code> timestamp. Verifiers derive effective lease state exclusively from the latest valid response, never from fields embedded in the credential itself. This separation prevents forgery, supports multi-device scenarios, and enables efficient state management.</p>
+    
+    <p>Lease-CAP is designed as a <strong>temporal control layer</strong> applicable to any capability-based authorization system, including UCAN, ZCAP-LD, and DIDComm-based agent-to-agent communication. The specification provides complete protocol definitions, cryptographic proof formats, verification algorithms, security analysis, and production-ready reference implementations in TypeScript and Python.</p>
+  </section>
+
+  <section id="sotd">
+    <p>This document is an Editor's Draft being prepared for consideration by the <strong>W3C Credentials Community Group (CCG)</strong>. It is not a W3C Standard nor is it on the W3C Standards Track.</p>
+    
+    <p><strong>Implementation Status:</strong> The specification has reached production readiness with complete reference implementations:</p>
+    <ul>
+      <li><strong>TypeScript/JavaScript:</strong> Production-ready implementation with full test suite, used in production deployments.</li>
+      <li><strong>Python:</strong> Production-ready implementation with comprehensive test coverage.</li>
+      <li><strong>Test Vectors:</strong> Complete set of edge-case test vectors covering all state transitions, error conditions, and security scenarios.</li>
+    </ul>
+    
+    <p><strong>Draft Note:</strong> This draft incorporates feedback from implementers and security reviewers. Key areas under active discussion include offline mode parameters, delegation chain depth limits, and multi-device synchronization semantics. Implementers are encouraged to provide feedback through the GitHub issue tracker.</p>
+    
+    <p>This document is governed by the <a href="https://www.w3.org/2023/Process-20231103/#patent-policy">W3C Patent Policy</a>.</p>
+  </section>
+
+  <section id="toc"></section>
+
+  <section id="introduction">
+    <h2>Introduction</h2>
+    
+    <p>Authorization in decentralized systems presents unique challenges absent in traditional client-server architectures. When there is no central authority to consult for every access decision, systems must rely on cryptographic proofs of authorization — capabilities that can be presented to any verifier without real-time issuer involvement. This delegation of authority is powerful but introduces fundamental security questions: How does a capability ever become invalid? How does an issuer revoke access? How does a verifier know that the controller still deserves access?</p>
+    
+    <section id="problem-statement">
+      <h3>Problem Statement</h3>
+      
+      <p>Traditional capability systems suffer from what we term the <strong>"zombie capability" problem</strong>: once issued, capabilities remain valid indefinitely unless explicitly revoked. In centralized systems, revocation can be enforced through token introspection or revocation lists. However, in decentralized systems where revocation information cannot be reliably propagated — due to network partitions, offline operation, or the absence of a centralized revocation authority — this creates significant security risks.</p>
+      
+      <p>Consider a typical scenario: An employee leaves an organization but possesses a capability issued months ago for accessing cloud resources. Without a central revocation service that the employee cannot bypass, that capability may remain usable indefinitely. Existing decentralized capability systems offer limited solutions:</p>
+      
+      <ul>
+        <li><strong>UCAN (User Controlled Authorization Networks)</strong> provides delegation chains but has no built-in revocation mechanism. Capabilities remain valid until their optional expiry, which many deployments omit.</li>
+        <li><strong>ZCAP-LD</strong> offers similar delegation without temporal freshness guarantees. Revocation requires global revocation lists that are difficult to maintain in decentralized environments.</li>
+        <li><strong>Time-bound tokens (OAuth-style)</strong> provide expiry but no renewal mechanism, requiring complete re-issuance — impractical for long-lived delegations.</li>
+      </ul>
+      
+      <p>The core insight of Lease-CAP is that <strong>authorization without liveness is incomplete in decentralized systems</strong>. A capability should not be a static, unchanging assertion of authority; rather, it should represent a continuing relationship that requires active maintenance. This shift from passive to active authorization fundamentally changes the security properties of decentralized systems.</p>
+    </section>
+
+    <section id="solution-overview">
+      <h3>Solution Overview</h3>
+      
+      <p>Lease-CAP introduces <strong>Liveness-Bound Capabilities (LBC)</strong> where validity is a function of continuous participation, not just issuance. Each capability carries a lease specification that defines two key parameters:</p>
+      
+      <ul>
+        <li><strong>TTL (Time-To-Live):</strong> The duration during which a capability remains ACTIVE after the last successful synchronization.</li>
+        <li><strong>GracePeriod:</strong> A bounded window after TTL expiration during which synchronization can still succeed, albeit with a "sync required" response from verifiers.</li>
+      </ul>
+      
+      <p>Capabilities transition through four deterministic states as time advances:</p>
+      
+      <table class="parameter-table">
+        <thead>
+          <tr>
+            <th>State</th>
+            <th>Condition</th>
+            <th>Verifier Action</th>
+            <th>Controller Action</th>
+            <th>Security Property</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>ACTIVE</strong></td>
+            <td><code>N ≤ L + T + ε</code></td>
+            <td>Grant access normally</td>
+            <td>Proactive sync recommended before TTL expiration</td>
+            <td>Full authorization; no issuer contact required</td>
+          </tr>
+          <tr>
+            <td><strong>STALE</strong></td>
+            <td><code>L + T + ε &lt; N ≤ L + T + G + ε</code></td>
+            <td>Return 403 with sync endpoint; require sync</td>
+            <td>Immediate sync required before retry</td>
+            <td>Bounded grace period; liveness preserved during partitions</td>
+          </tr>
+          <tr>
+            <td><strong>EXPIRED</strong></td>
+            <td><code>N > L + T + G + ε</code></td>
+            <td>Deny access; require re-issuance</td>
+            <td>Request new capability from issuer</td>
+            <td>Absolute expiry; zombie capability prevention</td>
+          </tr>
+          <tr>
+            <td><strong>FUTURE</strong></td>
+            <td><code>N &lt; L − Δ</code></td>
+            <td>Deny access; report clock inconsistency</td>
+            <td>Check system clock synchronization</td>
+            <td>Prevents timestamp manipulation attacks</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <p>The <strong>STALE state is the core innovation</strong> of Lease-CAP. It provides a bounded grace period for renewal that acknowledges the reality of distributed systems: network partitions happen, issuers may be temporarily unreachable, and controllers cannot always synchronize instantaneously. During this window, verifiers do not immediately deny access; instead, they return a 403 response that includes the sync endpoint and the verifier's current timestamp, enabling the controller to synchronize and retry. This design preserves liveness during temporary network issues without sacrificing security — a capability cannot remain in STALE indefinitely, as the GracePeriod bounds the window.</p>
+    </section>
+
+    <section id="what-makes-this-novel">
+      <h3>What Makes This Novel</h3>
+      
+      <p>Lease-CAP introduces the concept of <strong>synchronization-bound authority</strong> — the principle that authority decays unless actively maintained through cryptographic proof of continued authorization. This is fundamentally different from existing approaches:</p>
+      
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Approach</th>
+            <th>Mechanism</th>
+            <th>Liveness Guarantee</th>
+            <th>Revocation Capability</th>
+            <th>Offline Operation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Time-bound tokens (OAuth)</td>
+            <td>Passive decay with absolute expiry</td>
+            <td>None (just expiry)</td>
+            <td>Requires introspection endpoint</td>
+            <td>Limited (no renewal)</td>
+          </tr>
+          <tr>
+            <td>Revocation lists</td>
+            <td>Reactive control via lists</td>
+            <td>None (propagation delay)</td>
+            <td>Yes, but propagation is unbounded</td>
+            <td>Unreliable (lists may be stale)</td>
+          </tr>
+          <tr>
+            <td>Static capabilities (UCAN, ZCAP-LD)</td>
+            <td>None (immutable assertions)</td>
+            <td>None</td>
+            <td>No</td>
+            <td>Full (unbounded, which is a risk)</td>
+          </tr>
+          <tr>
+            <td><strong>Lease-CAP</strong></td>
+            <td><strong>Active synchronization</strong></td>
+            <td><strong>Bounded liveness (T+G window)</strong></td>
+            <td><strong>Yes, bounded by T+G</strong></td>
+            <td><strong>Bounded, explicit opt-in</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <p>Beyond the liveness guarantee, Lease-CAP introduces several novel technical contributions:</p>
+      
+      <ul>
+        <li><strong>State Separation:</strong> The static credential and dynamic lease state are strictly separated. This architectural decision prevents forgery, eliminates the need to re-issue credentials on every sync, and enables efficient multi-device scenarios where each device maintains its own lease state.</li>
+        
+        <li><strong>Cryptographic Binding:</strong> Every sync response includes a hash of the original capability credential. This prevents substitution attacks where an attacker presents a valid lease state for a different capability, a vulnerability present in naive implementations of temporal capabilities.</li>
+        
+        <li><strong>Lease Attenuation:</strong> Delegated capabilities must satisfy <code>T_child + G_child ≤ T_parent + G_parent</code>, ensuring that no child capability can outlive its parent's absolute expiration boundary. This preserves the principle of attenuation of authority throughout delegation chains.</li>
+        
+        <li><strong>Multi-Device Sync Independence:</strong> The specification explicitly handles scenarios where multiple devices hold the same capability, allowing each to sync independently without invalidating others. This is essential for real-world deployments where users expect to use the same identity across phones, laptops, and other devices.</li>
+      </ul>
+    </section>
+
+    <section id="relationship-to-existing-standards">
+      <h3>Relationship to Existing Standards</h3>
+      
+      <p>Lease-CAP is designed as a <strong>temporal control layer</strong> that can be applied to any capability-based authorization system. Rather than replacing existing standards, it extends them with liveness guarantees:</p>
+      
+      <dl>
+        <dt><strong>UCAN (User Controlled Authorization Networks)</strong></dt>
+        <dd>Lease-CAP wraps UCAN delegation chains with lease state, adding temporal freshness to UCAN's delegation model. The UCAN's optional expiry field can be set to <code>issuanceDate + maxLifetime</code> as an absolute upper bound, while lease state provides fine-grained liveness control.</dd>
+        
+        <dt><strong>ZCAP-LD</strong></dt>
+        <dd>Lease-CAP extends ZCAP-LD root capabilities with a lease specification. The ZCAP's invocation mechanism remains unchanged; lease state is carried separately, verified alongside the capability proof.</dd>
+        
+        <dt><strong>DIDComm</strong></dt>
+        <dd>Lease-CAP sync messages can be wrapped in DIDComm envelopes for agent-to-agent communication. The specification provides guidance on asynchronous sync handling, mediator support, and end-to-end encryption.</dd>
+        
+        <dt><strong>OAuth 2.0</strong></dt>
+        <dd>Lease-CAP offers a decentralized alternative to token introspection. Instead of a centralized introspection endpoint, issuers provide sync endpoints that controllers contact directly. Revocation is bounded and does not require real-time communication for every access.</dd>
+      </dl>
+      
+      <div class="note">
+        <p><strong>Integration Note:</strong> When integrating Lease-CAP with existing systems, the lease specification is added as a new property in the capability object. Verifiers that understand Lease-CAP check liveness; those that don't can ignore the lease specification and treat the capability as a traditional static capability (though this is not recommended for production deployments).</p>
+      </div>
+    </section>
+  </section>
+
+  <section id="conformance">
+    <h2>Conformance</h2>
+    
+    <p>This specification defines conformance criteria for three distinct roles: Controllers (entities that hold and exercise capabilities), Verifiers (entities that check capability validity), and Issuers (entities that create capabilities and manage sync state). Each role has mandatory and recommended requirements.</p>
+    
+    <section id="rfc-2119-language">
+      <h3>RFC 2119 Language</h3>
+      
+      <p>The key words <em class="rfc2119">MUST</em>, <em class="rfc2119">MUST NOT</em>, <em class="rfc2119">REQUIRED</em>, <em class="rfc2119">SHALL</em>, <em class="rfc2119">SHALL NOT</em>, <em class="rfc2119">SHOULD</em>, <em class="rfc2119">SHOULD NOT</em>, <em class="rfc2119">RECOMMENDED</em>, <em class="rfc2119">MAY</em>, and <em class="rfc2119">OPTIONAL</em> in this document are to be interpreted as described in <cite><a href="https://www.rfc-editor.org/rfc/rfc2119">RFC 2119</a></cite> and <cite><a href="https://www.rfc-editor.org/rfc/rfc8174">RFC 8174</a></cite>.</p>
+    </section>
+
+    <section id="conforming-controller">
+      <h3>Conforming Controller</h3>
+      
+      <p>A <dfn>Controller</dfn> is the entity that holds a capability and exercises it to access resources. In the Lease-CAP model, controllers are responsible for maintaining the liveness of their capabilities through periodic synchronization with issuers.</p>
+      
+      <p>A conforming Controller <em class="rfc2119">MUST</em>:</p>
+      
+      <ol>
+        <li><strong>Implement the sync protocol</strong> defined in <a href="#protocol-flows"></a>, including the ability to send signed <code>LeaseSyncRequest</code> messages and process <code>LeaseSyncResponse</code> responses.</li>
+        
+        <li><strong>Respect TTL and GracePeriod values</strong> from the issuer as specified in the capability's <code>leaseSpec</code>. Controllers <em class="rfc2119">MUST NOT</em> attempt to sync more frequently than the issuer's rate limits, nor less frequently than would cause the capability to expire.</li>
+        
+        <li><strong>Apply jitter to sync scheduling</strong> as defined in <a href="#thundering-herd"></a> to prevent thundering herd problems when large fleets of devices sync simultaneously.</li>
+        
+        <li><strong>Store and manage capabilities securely</strong>, protecting private keys and capability storage from unauthorized access. At minimum, capabilities <em class="rfc2119">SHOULD</em> be stored in encrypted form.</li>
+        
+        <li><strong>Generate valid capability invocation proofs</strong> using the <code>capabilityInvocation</code> proof purpose, demonstrating control over the controller's private key.</li>
+        
+        <li><strong>Never embed <code>lastSync</code> in the Verifiable Credential</strong>. The lease state is derived from <code>LeaseSyncResponse</code> objects stored separately. Any controller that embeds timestamps in the credential body is non-conforming.</li>
+        
+        <li><strong>Maintain a lease state cache</strong> keyed by <code>capabilityId</code>, storing the latest valid <code>LeaseSyncResponse</code> for each capability.</li>
+      </ol>
+      
+      <p>A conforming Controller <em class="rfc2119">SHOULD</em>:</p>
+      
+      <ol>
+        <li><strong>Perform proactive sync before TTL expiration</strong> rather than waiting for STALE responses from verifiers. Proactive sync eliminates the first-request latency penalty and provides a better user experience.</li>
+        
+        <li><strong>Implement Randomized Truncated Exponential Backoff</strong> for sync failures as defined in <a href="#implementation-guidance"></a>, preventing network storms during issuer outages.</li>
+        
+        <li><strong>Log audit events</strong> for compliance, including successful syncs, failed sync attempts, and access requests. Audit logs <em class="rfc2119">SHOULD</em> include timestamps, capability IDs, and results.</li>
+        
+        <li><strong>Detect clock drift</strong> by comparing local time with verifier timestamps received in 403 responses, and adjust sync timing accordingly.</li>
+      </ol>
+      
+      <div class="note">
+        <p><strong>Multi-device Considerations:</strong> When the same capability is held across multiple devices (e.g., a user's phone and laptop), each device maintains its own independent lease state cache and sync schedule. The issuer <em class="rfc2119">MUST</em> accept sync requests where <code>previousLastSync</code> does not match the issuer's most recent sync value, as long as it matches a previously issued value (including the initial <code>issuanceDate</code>). This allows each device to sync independently without coordination.</p>
+      </div>
+    </section>
+
+    <section id="conforming-verifier">
+      <h3>Conforming Verifier</h3>
+      
+      <p>A <dfn>Verifier</dfn> is the entity that checks capability validity before granting access to a protected resource. Verifiers are responsible for evaluating lease state, checking revocation status, and enforcing temporal bounds.</p>
+      
+      <p>A conforming Verifier <em class="rfc2119">MUST</em>:</p>
+      
+      <ol>
+        <li><strong>Implement the full state evaluation algorithm</strong> defined in <a href="#verification-algorithms"></a>, including all state transitions and priority ordering (FUTURE → REVOKED → INVALID → ACTIVE → STALE → EXPIRED).</li>
+        
+        <li><strong>Enforce the future skew bound Δ</strong> configurable per <code>leaseSpec</code>. If <code>now &lt; lastSync − Δ</code>, the capability <em class="rfc2119">MUST</em> be treated as FUTURE and rejected, regardless of other conditions.</li>
+        
+        <li><strong>Validate all cryptographic proofs</strong> using the appropriate verification method. Verifiers <em class="rfc2119">MUST</em> resolve the issuer's DID to obtain the current verification key and verify the proof according to the Data Integrity specification.</li>
+        
+        <li><strong>Maintain a revocation cache</strong> with <code>expiresAt</code> set to <code>max(revokedAt + TTL + GracePeriod, lastSeenTimestamp + TTL + GracePeriod)</code>. This formula ensures the cache entry outlives any capability instance that was valid at the time of revocation, even for verifiers that haven't recently seen the capability.</li>
+        
+        <li><strong>Reject capabilities where <code>now &lt; lastSync − Δ</code></strong> as FUTURE state, preventing timestamp manipulation attacks where an issuer or attacker sets <code>newLastSync</code> far in the future.</li>
+        
+        <li><strong>Derive effective lease state exclusively from the latest valid <code>LeaseSyncResponse</code></strong> in the lease state cache. If no valid response exists, use the initial state with <code>lastSync = issuanceDate</code>. Verifiers <em class="rfc2119">MUST NOT</em> read timestamp fields from the credential body.</li>
+        
+        <li><strong>Include the current timestamp in all 403 Sync Required responses</strong> using the <code>verifierTimestamp</code> field. This enables controllers to detect clock drift before attempting sync.</li>
+        
+        <li><strong>Reject any <code>LeaseSyncResponse</code> whose <code>capabilityHash</code> does not match <code>H(canonicalize(capability))</code></strong>. This check prevents substitution attacks where a valid lease state is presented for a different capability.</li>
+      </ol>
+      
+      <p>A conforming Verifier <em class="rfc2119">SHOULD</em>:</p>
+      
+      <ol>
+        <li><strong>Use NTP-synchronized wall-clock time</strong> with monotonic clocks for drift detection. While absolute time is needed for state evaluation, monotonic clocks provide a tamper-resistant source for measuring intervals.</li>
+        
+        <li><strong>Implement rate limiting per controller</strong> to prevent denial-of-service attacks. The RECOMMENDED rate limit is 10 sync requests per minute with a burst allowance of 30 requests.</li>
+        
+        <li><strong>Log verification decisions for audit</strong>, including the capability ID, controller DID, evaluated state, timestamp, and outcome. Audit logs <em class="rfc2119">SHOULD</em> be stored in a tamper-evident manner.</li>
+        
+        <li><strong>Support offline mode only when explicitly enabled by the issuer</strong> in the <code>leaseSpec.offlineMode</code> object. When offline mode is disabled, verifiers <em class="rfc2119">MUST</em> deny access if they cannot reach the issuer to verify STALE capabilities.</li>
+      </ol>
+    </section>
+
+    <section id="conforming-issuer">
+      <h3>Conforming Issuer</h3>
+      
+      <p>An <dfn>Issuer</dfn> is the entity that creates capabilities and manages their lease state. Issuers are trusted to enforce lease attenuation, maintain revocation state, and provide sync endpoints.</p>
+      
+      <p>A conforming Issuer <em class="rfc2119">MUST</em>:</p>
+      
+      <ol>
+        <li><strong>Provide a sync endpoint</strong> as defined in <a href="#protocol-flows"></a> that accepts <code>LeaseSyncRequest</code> messages and returns signed <code>LeaseSyncResponse</code> messages.</li>
+        
+        <li><strong>Sign all sync responses with <code>capabilityAssertion</code> proofs</strong> using the issuer's private key. The signature <em class="rfc2119">MUST</em> be verifiable using the verification method referenced in the capability credential.</li>
+        
+        <li><strong>Enforce lease attenuation</strong>: for any delegated capability, <code>T_child + G_child ≤ T_parent + G_parent</code> <em class="rfc2119">MUST</em> hold. Issuers <em class="rfc2119">MUST NOT</em> issue child capabilities that could outlive their parent's absolute expiration boundary.</li>
+        
+        <li><strong>Maintain capability state</strong> including revocation status, delegation chains, and historical <code>newLastSync</code> values (for at least <code>TTL + GracePeriod</code> to support multi-device scenarios).</li>
+        
+        <li><strong>Verify controller identity before issuing sync responses</strong> by checking the <code>capabilityInvocation</code> proof in the sync request. Issuers <em class="rfc2119">MUST</em> ensure the request signer matches the controller DID in the capability.</li>
+        
+        <li><strong>Not issue a successful <code>LeaseSyncResponse</code> for a revoked capability</strong>. If a capability is revoked, the issuer <em class="rfc2119">MUST</em> return a response with <code>status: "revoked"</code>.</li>
+        
+        <li><strong>Include <code>status = "revoked"</code> in sync responses for revoked capabilities</strong>, along with <code>revokedAt</code> timestamp and revocation reason. The response <em class="rfc2119">MUST</em> be signed normally.</li>
+        
+        <li><strong>Support configurable Δ per leaseSpec</strong> to accommodate different network environments (e.g., 5 seconds for web applications, 30 seconds for satellite links). When not specified, Δ defaults to 5000 ms.</li>
+        
+        <li><strong>Verify that a parent capability is in ACTIVE state before renewing a child capability</strong>. If the parent is STALE or EXPIRED, the issuer <em class="rfc2119">MUST NOT</em> issue a successful sync response for the child.</li>
+        
+        <li><strong>Remember previously issued <code>newLastSync</code> values</strong> for at least <code>TTL + GracePeriod</code> to support multi-device scenarios where one device's <code>previousLastSync</code> may be older than the most recent sync issued to another device.</li>
+      </ol>
+      
+      <p>A conforming Issuer <em class="rfc2119">SHOULD</em>:</p>
+      
+      <ol>
+        <li><strong>Implement rate limiting per controller</strong> to prevent abuse. The RECOMMENDED limit is 10 sync requests per minute with a burst of 30.</li>
+        
+        <li><strong>Support batch sync</strong> where a single request can update multiple capabilities simultaneously, improving privacy and efficiency.</li>
+        
+        <li><strong>Provide revocation endpoints</strong> allowing controllers or administrators to request revocation of compromised capabilities.</li>
+        
+        <li><strong>Monitor for thundering herd patterns</strong> where many devices sync simultaneously, and adjust sync response timing or rate limits accordingly.</li>
+      </ol>
+      
+      <div class="security-box">
+        <p><strong>Security Note on Parent State Verification:</strong> The requirement to verify parent ACTIVE state before renewing a child capability introduces a potential race condition: a parent could expire between the check and the child's next use. To mitigate this, issuers <em class="rfc2119">SHOULD</em> include the parent's <code>lastSync</code> value in the child's sync response, or verifiers <em class="rfc2119">SHOULD</em> re-check parent state during delegation chain verification (as specified in Algorithm 11.5).</p>
+      </div>
+    </section>
+  </section>
+
+  <section id="terminology">
+    <h2>Terminology</h2>
+    
+    <p>This section defines terms used throughout the specification. Readers familiar with Verifiable Credentials, DID Core, and capability-based authorization systems will recognize many concepts; Lease-CAP introduces new terminology around temporal state and synchronization.</p>
+    
+    <section id="core-terms">
+      <h3>Core Terms</h3>
+      
+      <dl>
+        <dt><dfn>Liveness-Bound Capability (LBC)</dfn></dt>
+        <dd>A capability whose validity requires periodic synchronization with the issuer. Unlike static capabilities that remain valid until revocation or expiry, LBCs decay over time unless actively maintained.</dd>
+        
+        <dt><dfn>Lease</dfn></dt>
+        <dd>The temporal validity period of a capability, defined by the combination of TTL and GracePeriod. The lease determines how long a capability remains ACTIVE after synchronization and how long it can be renewed.</dd>
+        
+        <dt><dfn>TTL (Time-To-Live)</dfn></dt>
+        <dd>The duration in seconds that a capability remains in the ACTIVE state after the <code>lastSync</code> timestamp. During this period, verifiers grant access without requiring issuer contact.</dd>
+        
+        <dt><dfn>GracePeriod</dfn></dt>
+        <dd>The duration in seconds after TTL expiration during which synchronization can still succeed. Capabilities in the STALE state are not granted access until sync completes, but they have not yet expired.</dd>
+        
+        <dt><dfn>lastSync</dfn></dt>
+        <dd>The <code>newLastSync</code> timestamp from the latest valid <code>LeaseSyncResponse</code> for a capability. This value determines the starting point for TTL and GracePeriod calculations.</dd>
+        
+        <dt><dfn>Effective Lease State</dfn></dt>
+        <dd>The current validity state (ACTIVE, STALE, EXPIRED, FUTURE, REVOKED, or INVALID) derived from the latest valid <code>LeaseSyncResponse</code> and the current time.</dd>
+        
+        <dt><dfn>Controller</dfn></dt>
+        <dd>The entity that holds a capability and exercises it to access resources. Controllers are responsible for maintaining liveness through synchronization.</dd>
+        
+        <dt><dfn>Issuer</dfn></dt>
+        <dd>The entity that creates and signs the capability credential and sync responses. Issuers manage lease state and enforce revocation.</dd>
+        
+        <dt><dfn>Verifier</dfn></dt>
+        <dd>The entity that checks capability validity before granting resource access. Verifiers evaluate lease state, check revocation, and enforce temporal bounds.</dd>
+        
+        <dt><dfn>Liveness Guarantee</dfn></dt>
+        <dd>The property that a capability remains valid only while the controller successfully synchronizes within bounded intervals. Formally, a capability is live at time t if there exists a valid sync response with <code>newLastSync > t - (T + G)</code>.</dd>
+        
+        <dt><dfn>Lease State Cache</dfn></dt>
+        <dd>The verifier- or controller-side store of received <code>LeaseSyncResponse</code> objects, keyed by <code>capabilityId</code>. The cache holds the most recent lease state for each capability.</dd>
+      </dl>
+    </section>
+
+    <section id="state-definitions">
+      <h3>State Definitions</h3>
+      
+      <p>The following parameters define the temporal state of a capability. All time values are expressed in milliseconds since the Unix epoch (1970-01-01T00:00:00Z), unless otherwise specified.</p>
+      
+      <p>Let:</p>
+      
+      <ul>
+        <li><code>L</code> = <code>lastSync</code> timestamp (milliseconds since epoch), from the latest valid <code>LeaseSyncResponse</code></li>
+        <li><code>T</code> = TTL in milliseconds (<code>leaseSpec.ttl × 1000</code>)</li>
+        <li><code>G</code> = GracePeriod in milliseconds (<code>leaseSpec.gracePeriod × 1000</code>)</li>
+        <li><code>N</code> = current time on the verifier's NTP-synchronized wall-clock (milliseconds since epoch)</li>
+        <li><code>ε</code> = clockTolerance in milliseconds (RECOMMENDED: 5000 ms)</li>
+        <li><code>Δ</code> = futureSkewBound in milliseconds (configurable per leaseSpec; RECOMMENDED default: 5000 ms)</li>
+      </ul>
+      
+      <p>The four temporal states are <strong>mutually exclusive</strong> and evaluated in the following priority order:</p>
+      
+      <ol>
+        <li><strong>FUTURE:</strong> <code>N &lt; L − Δ</code> — The <code>lastSync</code> timestamp is too far in the future relative to the verifier's clock, indicating possible clock manipulation or an issuer error.</li>
+        <li><strong>REVOKED:</strong> The issuer has explicitly revoked the capability (checked separately via revocation cache).</li>
+        <li><strong>INVALID:</strong> The capability proof is invalid or the controller does not match.</li>
+        <li><strong>ACTIVE:</strong> <code>L − Δ ≤ N ≤ L + T + ε</code> — The capability is within its TTL window and can be used normally.</li>
+        <li><strong>STALE:</strong> <code>L + T + ε &lt; N ≤ L + T + G + ε</code> — The TTL has elapsed but the capability is within the grace period; sync is required before access.</li>
+        <li><strong>EXPIRED:</strong> <code>N > L + T + G + ε</code> — The capability has exceeded both TTL and GracePeriod; it cannot be renewed and requires re-issuance.</li>
+      </ol>
+      
+      <div class="note">
+        <p><strong>On Clock Tolerance ε:</strong> The clock tolerance <code>ε</code> is applied symmetrically to both the ACTIVE/STALE boundary and the STALE/EXPIRED boundary. A capability with <code>N = L + T + ε</code> is ACTIVE; at <code>N = L + T + ε + 1ms</code> it becomes STALE. This provides symmetric handling of clock skew without creating overlapping state regions or gaps.</p>
+      </div>
+      
+      <div class="note">
+        <p><strong>On Future Skew Bound Δ:</strong> The <code>Δ</code> parameter prevents attacks where an issuer or replay attack sets <code>newLastSync</code> far in the future, effectively bypassing expiration. If the verifier's clock is properly synchronized, <code>Δ</code> should be set to a small value (e.g., 5 seconds). For high-latency environments (e.g., satellite communications), <code>Δ</code> may be increased to accommodate legitimate clock differences.</p>
+      </div>
+    </section>
+
+    <section id="notation">
+      <h3>Notation</h3>
+      
+      <p>The following notation is used throughout this specification:</p>
+      
+      <table class="parameter-table">
+        <thead>
+          <tr><th>Symbol</th><th>Meaning</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>||</code></td><td>Concatenation of byte strings</td><td><code>"abc" || "def" = "abcdef"</code></td></tr>
+          <tr><td><code>H(x)</code></td><td>SHA-256 hash of x, returned as hex-encoded string</td><td><code>H("hello") = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"</code></td></tr>
+          <tr><td><code>Sign(k, m)</code></td><td>Digital signature of message m with key k using Ed25519</td><td><code>Sign(privateKey, canonicalDoc)</code></td></tr>
+          <tr><td><code>[x]</code></td><td>Optional element; may be present or absent</td><td><code>"proof": { ... }</code> is optional in some contexts</td></tr>
+          <tr><td><code>canonicalize(x)</code></td><td>JSON Canonicalization Scheme (RFC 8785) applied to x</td><td><code>canonicalize({"a":1,"b":2})</code> produces deterministic output</td></tr>
+          <tr><td><code>base58btc(s)</code></td><td>Base58 Bitcoin encoding of byte string s</td><td>Used for proof values in Data Integrity proofs</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </section>
+
+  <section id="liveness-property">
+    <h2>Liveness Property</h2>
+    
+    <p>The liveness property is the fundamental contribution of Lease-CAP. In distributed systems, liveness guarantees that something good eventually happens — in this case, that an authorized controller can eventually gain access to a resource. Safety guarantees that something bad never happens — that unauthorized access never occurs. Lease-CAP provides both.</p>
+    
+    <section id="definition-of-liveness">
+      <h3>Definition</h3>
+      
+      <p>A capability is considered <dfn>live</dfn> if and only if the controller can successfully synchronize with the issuer within intervals bounded by TTL and GracePeriod. Formally:</p>
+      
+      <pre>Live(capability, t) ⇔ ∃ valid LeaseSyncResponse R such that R.newLastSync > t − (T + G)</pre>
+      
+      <p>This definition captures the intuition that a live capability is one where the controller has successfully maintained the authorization relationship within a bounded time window of length <code>T + G</code> before time <code>t</code>. The issuer's memory of successful syncs anchors the liveness property.</p>
+      
+      <p>Note that liveness is distinct from safety: a capability could be safe (not usable by unauthorized parties) but not live (the authorized controller cannot use it due to sync failures). The STALE state is specifically designed to trade off liveness against safety during network partitions.</p>
+    </section>
+
+    <section id="liveness-guarantee">
+      <h3>Liveness Guarantee</h3>
+      
+      <p><strong>Theorem (Liveness Guarantee):</strong> For any capability that has not been revoked, there exists a bounded time window <code>[lastSync, lastSync + T + G]</code> during which a controller who can successfully synchronize will be granted access. Outside this window, the capability is EXPIRED regardless of controller intent.</p>
+      
+      <p>This guarantee has several important consequences:</p>
+      
+      <ul>
+        <li><strong>Bounded Revocation:</strong> Even if the issuer does not actively revoke a capability, it will naturally expire within <code>lastSync + T + G</code> of the last successful sync. This bounds the "zombie capability" window.</li>
+        
+        <li><strong>Failure Detection:</strong> If a controller fails to sync within <code>T + G</code>, the system can safely assume the controller is no longer authorized (or the network is partitioned).</li>
+        
+        <li><strong>Partition Tolerance:</strong> During network partitions, capabilities remain usable for at most <code>T + G</code> without sync. The STALE state provides a <code>G</code>-length window where access is blocked until sync completes, rather than immediately expiring.</li>
+      </ul>
+      
+      <p>The guarantee is bounded because the issuer cannot guarantee liveness indefinitely — if the controller cannot reach the issuer, eventually the capability will expire. This is an intentional design choice: unbounded offline operation is a security risk, as it allows capabilities to be used long after they should be invalid.</p>
+    </section>
+
+    <section id="relationship-to-safety">
+      <h3>Relationship to Safety</h3>
+      
+      <p>Safety and liveness are complementary properties. In Lease-CAP:</p>
+      
+      <table class="parameter-table">
+        <thead>
+          <tr><th>Property</th><th>Definition</th><th>Lease-CAP Mechanism</th><th>Bound</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Safety</strong> (no unauthorized access)
+            <td>Unauthorized parties cannot access protected resources
+            <td>Revocation + cryptographic expiry + proof verification
+            <td>Absolute: access requires valid proofs and non-expired state
+          </tr>
+          <tr>
+            <td><strong>Liveness</strong> (authorized access eventually possible)
+            <td>Authorized controllers can eventually gain access
+            <td>Sync protocol + STALE grace period
+            <td>Temporary: depends on network connectivity and issuer availability
+          </tr>
+        </tbody>
+      </table>
+      
+      <p>The STALE state represents the trade-off between these properties. During network partitions, liveness may be temporarily sacrificed (access is blocked until sync completes) to preserve safety (a capability that cannot sync will eventually expire rather than remaining usable indefinitely). This trade-off is controlled by the <code>gracePeriod</code> parameter, which can be tuned based on expected network reliability.</p>
+      
+      <div class="note">
+        <p><strong>Formal Property:</strong> Lease-CAP provides eventual liveness under the assumption of eventual issuer reachability. Formally: if a capability is not revoked and the issuer becomes reachable within some finite time <code>δ</code>, then there exists a time <code>t &le; lastSync + T + G + δ</code> such that the controller can sync and regain access. The worst-case liveness delay is <code>δ + (network round-trip time)</code>.</p>
+      </div>
+    </section>
+  </section>
+
+  <section id="security-model">
+    <h2>Security Model</h2>
+    
+    <p>The security model defines the capabilities of attackers, the security goals of the system, and the trust assumptions required for correct operation. This model informs the design decisions throughout the specification.</p>
+    
+    <section id="attacker-capabilities">
+      <h3>Attacker Capabilities</h3>
+      
+      <p>The security model assumes an attacker who can:</p>
+      
+      <ol>
+        <li><strong>Compromise controllers:</strong> steal private keys or capability storage, either through software vulnerabilities or physical access.</li>
+        
+        <li><strong>Observe network traffic:</strong> eavesdrop on sync requests and responses, gaining knowledge of which capabilities are being exercised and when.</li>
+        
+        <li><strong>Replay messages:</strong> capture and retransmit old sync responses, potentially attempting to extend capability lifetime.</li>
+        
+        <li><strong>Manipulate clocks:</strong> adjust system time within bounds, either on the controller, verifier, or issuer, to attempt to extend or shrink temporal windows.</li>
+        
+        <li><strong>Control network partitions:</strong> block access to issuers temporarily, either through network-level attacks or by compromising network infrastructure.</li>
+        
+        <li><strong>Launch denial-of-service attacks:</strong> flood sync endpoints with requests, potentially overwhelming issuers.</li>
+      </ol>
+      
+      <p>The attacker <em class="rfc2119">CANNOT</em>:</p>
+      
+      <ol>
+        <li><strong>Compromise the issuer's private key</strong> — this would allow the attacker to issue arbitrary sync responses and break all security properties.</li>
+        
+        <li><strong>Break cryptographic primitives</strong> (Ed25519 for signatures, SHA-256 for hashing) — these are assumed to be secure under standard cryptographic assumptions.</li>
+        
+        <li><strong>Undetectably modify signed messages</strong> — any modification to a signed message will cause signature verification to fail.</li>
+        
+        <li><strong>Control NTP-synchronized clocks on honest verifiers</strong> — verifiers are assumed to maintain accurate time through trusted NTP sources or hardware clocks.</li>
+      </ol>
+      
+      <p>These attacker capabilities represent a realistic threat model for decentralized systems. The security mitigations are designed to remain effective even when multiple attacker capabilities are combined.</p>
+    </section>
+
+    <section id="security-goals">
+      <h3>Security Goals</h3>
+      
+      <p>Lease-CAP is designed to achieve the following security goals, each of which is formally defined and verified in the security analysis:</p>
+      
+      <ol>
+        <li><strong>Freshness:</strong> Capabilities cannot be used beyond their intended temporal window. More formally: for any capability usage at time <code>t</code>, there must exist a valid sync response with <code>newLastSync > t - (T + G)</code>. This bounds the "zombie capability" window.</li>
+        
+        <li><strong>Revocability:</strong> Issuers can revoke capabilities with bounded propagation delay. When an issuer marks a capability as revoked, all verifiers will reject that capability within at most <code>T + G</code> time units. This bound is tight — after <code>T + G</code>, the capability would have expired anyway.</li>
+        
+        <li><strong>Delegation safety:</strong> Delegated capabilities cannot exceed parent authority or lifetime. For any valid delegation chain, the lease parameters must satisfy <code>T_child + G_child ≤ T_parent + G_parent</code>. This ensures the child capability cannot outlive its parent.</li>
+        
+        <li><strong>Replay resistance:</strong> Captured sync responses cannot extend capability lifetime beyond intended bounds. The combination of strictly increasing timestamps, nonce binding, and <code>previousLastSync</code> chaining prevents replay attacks.</li>
+        
+        <li><strong>Offline safety:</strong> Offline mode provides bounded grace without compromising security. When offline mode is enabled, capabilities can be used for at most <code>maxDurationSeconds</code> without issuer contact, and the <code>graceMultiplier</code> is bounded by 2.0.</li>
+        
+        <li><strong>Binding integrity:</strong> Lease state cannot be substituted across different capability credentials. The <code>capabilityHash</code> field in every sync response cryptographically binds the lease state to a specific capability credential.</li>
+      </ol>
+    </section>
+
+    <section id="trust-assumptions">
+      <h3>Trust Assumptions</h3>
+      
+      <p>Lease-CAP operates under the following trust assumptions. These assumptions must be satisfied for the security guarantees to hold:</p>
+      
+      <ol>
+        <li><strong>Issuers are trusted to enforce lease attenuation, revocation, and parent-state checks.</strong> A malicious issuer could violate these properties, but such behavior would be detectable through audit logs and would violate the issuer's reputation. In decentralized systems, trust in issuers is typically established through DID-based identities and verifiable credentials.</li>
+        
+        <li><strong>NTP-synchronized clocks are available on verifiers</strong> (hardware-backed where required by policy). Clock manipulation is a primary attack vector; verifiers must maintain accurate time. High-security deployments <em class="rfc2119">SHOULD</em> use hardware security modules (HSMs) or trusted platform modules (TPMs) for timekeeping.</li>
+        
+        <li><strong>Cryptographic keys are stored securely</strong> (HSM or equivalent for high-security deployments). Key compromise is catastrophic; controllers and issuers must protect private keys accordingly.</li>
+        
+        <li><strong>TLS provides channel security</strong> (defense in depth alongside cryptographic proofs). While cryptographic proofs provide message integrity and authenticity, TLS protects against traffic analysis and provides forward secrecy.</li>
+        
+        <li><strong>Verifiers correctly implement the state evaluation algorithm</strong> and enforce all bounds. A faulty verifier could grant inappropriate access or deny legitimate access.</li>
+      </ol>
+      
+      <div class="warning">
+        <p><strong>Trust Minimization:</strong> Lease-CAP minimizes trust requirements compared to centralized systems. Verifiers do not need to trust issuers beyond verifying cryptographic proofs. Controllers do not need to trust verifiers beyond accepting signed responses. The only entity that requires significant trust is the issuer, which is identified by a DID and can be held accountable through verifiable evidence.</p>
+      </div>
+    </section>
+
+    <section id="threat-model-summary">
+      <h3>Threat Model Summary</h3>
+      
+      <p>The following table summarizes key threats, their mitigations, and the sections where mitigations are specified:</p>
+      
+      <table class="parameter-table">
+        <thead>
+          <tr><th>Threat</th><th>Mitigation</th><th>Section</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Zombie capabilities</td><td>Natural expiration <code>(T + G)</code> bounds worst-case lifetime</td><td><a href="#state-machine"></a></td></tr>
+          <tr><td>Clock manipulation</td><td><code>ε</code> + <code>Δ</code> bounds, NTP synchronization, monotonic clocks</td><td><a href="#clock-skew"></a></td></tr>
+          <tr><td>Replay attacks</td><td>Strictly increasing timestamps + nonce binding + <code>previousLastSync</code> chain + issuer historical state</td><td><a href="#replay-attacks"></a></td></tr>
+          <tr><td>Capability substitution</td><td><code>capabilityHash</code> binding in every sync response</td><td><a href="#cryptographic-binding"></a></td></tr>
+          <tr><td>Revocation race</td><td>Issuer refuses sync for revoked caps; verifier caches revocation proofs with extended expiry</td><td><a href="#revocation-race"></a></td></tr>
+          <tr><td>Denial of service</td><td>Rate limiting + randomized truncated exponential backoff</td><td><a href="#denial-of-service"></a></td></tr>
+          <tr><td>Key compromise</td><td>Revocation endpoint + cache; key rotation via re-issuance</td><td><a href="#key-compromise"></a></td></tr>
+          <tr><td>Thundering herd</td><td>Jitter + truncated exponential backoff + load-aware sync window assignment</td><td><a href="#thundering-herd"></a></td></tr>
+          <tr><td>Offline abuse</td><td>Bounded grace + audit + multiplier limit + explicit issuer opt-in</td><td><a href="#offline-mode-security"></a></td></tr>
+          <tr><td>Lease attenuation bypass</td><td><code>T_child + G_child ≤ T_parent + G_parent</code> enforced by issuer</td><td><a href="#lease-attenuation"></a></td></tr>
+          <tr><td>Parent expiry bypass</td><td>Issuer checks parent ACTIVE state before renewing child</td><td><a href="#lease-attenuation"></a></td></tr>
+        </tbody>
+      </table>
+    </section>
+  </section>
+
+  <section id="core-concepts">
+    <h2>Core Concepts</h2>
+    
+    <p>The following concepts form the foundation of Lease-CAP. Understanding these concepts is essential for implementing conforming systems.</p>
+    
+    <section id="state-separation">
+      <h3>State Separation: Static Credential and Dynamic Lease State</h3>
+      
+      <p>A Liveness-Bound Capability consists of two <strong>strictly separated</strong> components. This separation is a fundamental architectural decision that enables efficient state management, prevents forgery, and supports multi-device scenarios.</p>
+      
+      <p><strong>Static Capability Credential (immutable):</strong> A W3C Verifiable Credential containing fixed properties that never change throughout the capability's lifetime:</p>
+      
+      <ul>
+        <li>Issuer DID and verification method</li>
+        <li>Controller DID (the entity authorized to exercise the capability)</li>
+        <li>Invocation target (the resource or service being accessed)</li>
+        <li>Allowed actions (e.g., read, write, delete)</li>
+        <li>Lease specification (TTL, GracePeriod, sync endpoint, offline mode configuration)</li>
+        <li>Caveats (additional constraints like rate limits or geographic restrictions)</li>
+      </ul>
+      
+      <p>Once issued, this document <em class="rfc2119">MUST NOT</em> change. Any modification would invalidate the issuer's signature and break the cryptographic binding to lease state.</p>
+      
+      <p><strong>Dynamic Lease State (mutable, issuer-signed):</strong> A <code>LeaseSyncResponse</code> object that captures the current synchronization state of the capability:</p>
+      
+      <ul>
+        <li><code>newLastSync</code>: The timestamp of the most recent successful sync (or issuance date for initial state)</li>
+        <li><code>previousLastSync</code>: The previous sync timestamp, enabling chain validation</li>
+        <li><code>nextSyncRecommended</code>: Optional hint from the issuer about optimal next sync time</li>
+        <li><code>capabilityHash</code>: Cryptographic binding to the static credential</li>
+        <li><code>status</code>: "active" or "revoked"</li>
+      </ul>
+      
+      <p>This object is NOT embedded in the credential. It is stored separately by controllers and verifiers, updated each time a successful sync occurs.</p>
+      
+      <div class="warning">
+        <p><strong>Critical Implementation Requirement:</strong> The <code>lastSync</code> value <em class="rfc2119">MUST NOT</em> appear in the Verifiable Credential body. Any implementation that embeds <code>lastSync</code> inside <code>credentialSubject</code> is non-conforming. Embedding timestamps in the credential would require re-issuing the credential on every sync, defeating the purpose of state separation, and would allow controllers to forge lease state by presenting a self-constructed credential. Verifiers <em class="rfc2119">MUST</em> derive the effective lease state from the latest valid <code>LeaseSyncResponse</code> stored in their lease state cache.</p>
+      </div>
+    </section>
+
+    <section id="effective-lease-state">
+      <h3>Effective Lease State</h3>
+      
+      <p>The <dfn>Effective Lease State</dfn> of a capability is determined by the latest valid <code>LeaseSyncResponse</code> in the lease state cache:</p>
+      
+      <pre>EffectiveLeaseState(capabilityId) = entry in LeaseStateCache with largest newLastSync
+                                    that passes proof verification and capabilityHash check</pre>
+      
+      <p>If no valid <code>LeaseSyncResponse</code> exists in the cache, the initial lease state is:</p>
+      
+      <ul>
+        <li><code>lastSync</code> = <code>issuanceDate</code> of the capability credential</li>
+        <li><code>previousLastSync</code> = null</li>
+        <li><code>status</code> = "active"</li>
+      </ul>
+      
+      <p>This means a freshly issued capability is immediately usable without a prior sync, for up to TTL seconds from issuance. This design choice enables smooth onboarding and reduces latency for first use.</p>
+      
+      <p>Verifiers and controllers maintain their own caches, which may diverge temporarily. This is acceptable because:</p>
+      
+      <ul>
+        <li>Verifiers can only grant access based on their cache state; if a controller has a newer lease state not yet seen by the verifier, the controller will receive a 403 response and can present the newer sync response.</li>
+        <li>Controllers can proactively sync to update their cache; verifiers learn of new lease states when controllers present them.</li>
+        <li>The <code>capabilityHash</code> ensures that even if caches diverge, the binding to the correct credential is maintained.</li>
+      </ul>
+    </section>
+
+    <section id="cryptographic-binding">
+      <h3>Cryptographic Binding Between Credential and Lease State</h3>
+      
+      <p>To prevent substitution attacks — where an attacker presents a valid lease state for a different capability with the same ID — each <code>LeaseSyncResponse</code> <em class="rfc2119">MUST</em> include a hash of the original capability credential:</p>
+      
+      <pre class="test-vector">
+{
+  "capabilityId": "urn:cap:9f8e7d6c...",
+  "capabilityHash": "H(canonicalize(capability))",
+  "newLastSync": "...",
+  "proof": { ... }
+}</pre>
+      
+      <p>Verifiers <em class="rfc2119">MUST</em> check:</p>
+      
+      <pre>H(canonicalize(capability)) == response.capabilityHash</pre>
+      
+      <p>If the check fails, the sync response <em class="rfc2119">MUST</em> be rejected and the effective lease state <em class="rfc2119">MUST NOT</em> be updated.</p>
+      
+      <p><strong>Attack Scenario Prevented:</strong> Without this binding, an attacker could:</p>
+      
+      <ol>
+        <li>Obtain a valid <code>LeaseSyncResponse</code> for capability A (which they legitimately control).</li>
+        <li>Create a new capability B with the same <code>capabilityId</code> but a different controller DID.</li>
+        <li>Present the sync response for A as if it applied to B, potentially gaining access with B using A's lease state.</li>
+      </ol>
+      
+      <p>The <code>capabilityHash</code> prevents this by ensuring each sync response is cryptographically bound to a specific credential. Since the hash includes the controller DID and all other fields, any change to the credential results in a different hash, causing verification to fail.</p>
+    </section>
+
+    <section id="lease-attenuation">
+      <h3>Lease Attenuation and Delegation</h3>
+      
+      <p>Capability delegation is a powerful feature of capability-based systems. Lease-CAP supports delegation with the important constraint of <strong>lease attenuation</strong>: a delegated capability cannot have a longer effective lifetime than its parent.</p>
+      
+      <p>When delegating capabilities, the following <em class="rfc2119">MUST</em> hold:</p>
+      
+      <pre>T_child + G_child ≤ T_parent + G_parent</pre>
+      
+      <p>A child capability <em class="rfc2119">MUST NOT</em> outlive the absolute expiration boundary of its parent. This preserves the principle of attenuation of authority: a delegate cannot receive more authority than the delegator possesses.</p>
+      
+      <p><strong>Child Sync Independence:</strong> A child capability's <code>lastSync</code> can be updated independently of its parent. The child maintains its own lease state cache and sync schedule. However, the issuer <em class="rfc2119">MUST</em> verify that the parent capability is in ACTIVE state at the time of the child's renewal request. If the parent is STALE or EXPIRED, the issuer <em class="rfc2119">MUST NOT</em> issue a successful sync response for the child.</p>
+      
+      <p><strong>Delegation Chain Depth:</strong> Implementations <em class="rfc2119">MUST</em> enforce a configurable maximum delegation depth. The RECOMMENDED maximum depth is 5 levels. Chains exceeding this depth <em class="rfc2119">MUST</em> be rejected. This prevents unbounded recursion and potential denial-of-service attacks through deep delegation chains.</p>
+      
+      <p><strong>Example:</strong></p>
+      
+      <ul>
+        <li>Parent capability: TTL = 86400 seconds (24 hours), GracePeriod = 300 seconds (5 minutes). Total lifetime = 24h 5m.</li>
+        <li>Child capability: TTL = 43200 seconds (12 hours), GracePeriod = 300 seconds (5 minutes). Total lifetime = 12h 5m (valid, ≤ parent).</li>
+        <li>Invalid child: TTL = 86400 seconds, GracePeriod = 600 seconds (10 minutes). Total lifetime = 24h 10m (invalid, > parent).</li>
+      </ul>
+    </section>
+
+    <section id="synchronization-bound-authority">
+      <h3>Synchronization-Bound Authority</h3>
+      
+      <p>Lease-CAP's fundamental contribution is that <strong>authority decays unless actively maintained</strong>. This represents a paradigm shift from static to dynamic authorization. To understand why this matters, consider the differences:</p>
+      
+      <ul>
+        <li><strong>Static capabilities (ZCAP-LD, UCAN without expiry):</strong> Valid until explicitly revoked. In decentralized systems where revocation is difficult, this creates unbounded risk.</li>
+        
+        <li><strong>Time-bound tokens (OAuth):</strong> Valid until absolute expiry, but no renewal possible. This requires frequent re-issuance, which is impractical for long-lived delegations.</li>
+        
+        <li><strong>Refresh tokens (OAuth):</strong> Renewal possible but centralized and not delegatable. The refresh token is a backchannel secret that cannot be further delegated.</li>
+        
+        <li><strong>Lease-CAP:</strong> Authority is maintained through periodic synchronization. The controller <em class="rfc2119">MUST</em> regularly prove continued authorization to the issuer. The STALE state provides a bounded window for this proof without service interruption.</li>
+      </ul>
+      
+      <p>This synchronization-bound authority has several benefits:</p>
+      
+      <ol>
+        <li><strong>Automatic expiration:</strong> Even without explicit revocation, capabilities expire naturally if not maintained.</li>
+        
+        <li><strong>Freshness verification:</strong> Verifiers can be confident that recently-synced capabilities represent current authorization.</li>
+        
+        <li><strong>Compromise recovery:</strong> If a controller is compromised, the attacker's access is limited to at most <code>T + G</code> from the last sync.</li>
+        
+        <li><strong>Audit visibility:</strong> Sync events provide a verifiable audit trail of continued authorization.</li>
+      </ol>
+    </section>
+
+    <section id="future-state-protection">
+      <h3>Future State Protection</h3>
+      
+      <p>To prevent attacks where an issuer or replay sets <code>newLastSync</code> far in the future — effectively bypassing expiration — verifiers <em class="rfc2119">MUST</em> enforce a maximum future skew bound <code>Δ</code>. If <code>N &lt; L − Δ</code>, the capability <em class="rfc2119">MUST</em> be treated as FUTURE and rejected.</p>
+      
+      <p><strong>Attack Scenario:</strong> Without FUTURE protection, an attacker could:</p>
+      
+      <ol>
+        <li>Compromise an issuer or intercept a sync response.</li>
+        <li>Modify the <code>newLastSync</code> timestamp to a value far in the future (e.g., year 2030).</li>
+        <li>Present this modified response to verifiers, who would see a valid signature and treat the capability as ACTIVE for years.</li>
+      </ol>
+      
+      <p><strong>Mitigation:</strong> The FUTURE state rejects any capability where the verifier's current time is more than <code>Δ</code> behind <code>lastSync</code>. Since <code>Δ</code> is typically small (5 seconds for most applications), any timestamp significantly in the future is rejected.</p>
+      
+      <p>The value of <code>Δ</code> <em class="rfc2119">SHOULD</em> be configurable per <code>leaseSpec</code> to accommodate different environments:</p>
+      
+      <ul>
+        <li><strong>5 seconds:</strong> High-speed networks, local deployments, financial transactions</li>
+        <li><strong>30 seconds:</strong> Satellite links, cross-continental communication</li>
+        <li><strong>60 seconds:</strong> Highly asynchronous environments, batch processing</li>
+      </ul>
+      
+      <p>When not specified, <code>Δ</code> defaults to 5000 ms (5 seconds).</p>
+    </section>
+
+    <section id="temporal-coupling">
+      <h3>Temporal Coupling Across Delegation Chains</h3>
+      
+      <p>During verification of a delegation chain, each capability in the chain <em class="rfc2119">MUST</em> be evaluated at the same reference time <code>N</code>. If any capability in the chain resolves to STALE or EXPIRED, the entire chain <em class="rfc2119">MUST</em> be treated as invalid for the purpose of granting access, unless the controller performs sync and retries.</p>
+      
+      <p>This temporal coupling ensures that a controller cannot bypass the liveness requirement by using a stale parent capability to authorize a child. The entire delegation chain must be fresh at the time of access.</p>
+      
+      <p><strong>Example:</strong></p>
+      
+      <ul>
+        <li>Root capability: lastSync = 2024-01-15T10:00:00Z, TTL = 24h, GracePeriod = 5m</li>
+        <li>Child capability: lastSync = 2024-01-15T12:00:00Z, TTL = 12h, GracePeriod = 5m</li>
+        <li>Current time: 2024-01-16T11:00:00Z</li>
+      </ul>
+      
+      <p>The root capability's TTL expired at 2024-01-16T10:00:00Z. Even though the child's TTL (from its 12:00 sync) expires at 2024-01-16T00:00:00Z, both are evaluated at the same time. The root is STALE/EXPIRED (depending on whether within grace), so the entire chain is invalid.</p>
+    </section>
+  </section>
+
+  <section id="data-model">
+    <h2>Data Model</h2>
+    
+    <p>The Lease-CAP data model defines the structure of capability credentials, sync messages, and cache entries. All messages are JSON objects that can be signed using W3C Data Integrity proofs.</p>
+    
+    <section id="capability-credential-detailed">
+      <h3>Capability Credential (Static, Immutable)</h3>
+      
+      <p>The Capability Credential is a W3C Verifiable Credential with additional context for lease specifications. The <code>leaseSpec</code> field carries all lease parameters needed by both controllers and verifiers. <strong>Note that <code>lastSync</code> does NOT appear here</strong> — it is part of the dynamic lease state.</p>
+      
+      <pre class="test-vector">
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/lease-cap/v1"
+  ],
+  "id": "urn:cap:9f8e7d6c-4b3a-2c1d-8e7f-6a5b4c3d2e1f",
+  "type": ["VerifiableCredential", "LeaseCapability"],
+  "issuer": "did:key:z6MkhaXgBcjvVgJKKKZo9vQqYhF8JxqB3d5hL5xK5X5x5X",
+  "issuanceDate": "2024-01-15T10:00:00Z",
+  "credentialSubject": {
+    "id": "did:key:z6MkhaXgBcjvVgJKKKZo9vQqYhF8JxqB3d5hL5xK5X5x5Y",
+    "capability": {
+      "invocationTarget": "https://storage.example.com/api/v1/buckets/user-123",
+      "allowedActions": ["read", "write", "list"],
+      "leaseSpec": {
+        "ttl": 86400,
+        "gracePeriod": 300,
+        "futureSkewBound": 5000,
+        "syncEndpoint": "https://issuer.example.com/api/v1/capabilities/sync",
+        "syncMethod": "POST",
+        "offlineMode": {
+          "enabled": false
+        }
+      },
+      "caveats": [
+        {
+          "type": "ExpiresAt",
+          "value": "2025-12-31T23:59:59Z"
+        },
+        {
+          "type": "RateLimit",
+          "maxRequests": 1000,
+          "window": 3600
+        }
+      ]
+    }
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-2022",
+    "created": "2024-01-15T10:00:00Z",
+    "verificationMethod": "did:key:z6MkhaXgBcjvVgJKKKZo9vQqYhF8JxqB3d5hL5xK5X5x5X#z6MkhaXgBcjvVgJKKKZo9vQqYhF8JxqB3d5hL5xK5X5x5X",
+    "proofPurpose": "capabilityDelegation",
+    "proofValue": "z5hRKZ..."
+  }
+}
+</pre>
+      
+      <p><strong>Key points about the credential structure:</strong></p>
+      
+      <ul>
+        <li><code>leaseSpec.offlineMode</code> carries the offline configuration. <code>enabled: false</code> means offline mode is not permitted; the verifier <em class="rfc2119">MUST</em> deny access if the issuer is unreachable.</li>
+        <li><code>leaseSpec.offlineMode.maxDurationSeconds</code> and <code>leaseSpec.offlineMode.graceMultiplier</code> are present only when <code>enabled: true</code>.</li>
+        <li><code>lastSync</code> is NOT a field in this document. Its absence from any test vector or implementation that claims conformance is intentional.</li>
+        <li>The <code>caveats</code> array can contain additional constraints beyond the lease specification, such as absolute expiration, rate limits, or geographic restrictions.</li>
+      </ul>
+    </section>
+
+    <section id="lease-sync-response-detailed">
+      <h3>Lease Sync Response (Dynamic, Issuer-Signed)</h3>
+      
+      <p>This object is returned by the issuer at sync time. It is stored in the verifier's and/or controller's lease state cache. It is the <strong>sole authoritative source</strong> of <code>lastSync</code>.</p>
+      
+      <pre class="test-vector">
+{
+  "type": "LeaseSyncResponse",
+  "capabilityId": "urn:cap:9f8e7d6c-4b3a-2c1d-8e7f-6a5b4c3d2e1f",
+  "capabilityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "previousLastSync": "2024-01-14T10:00:00Z",
+  "newLastSync": "2024-01-15T10:00:00Z",
+  "nextSyncRecommended": "2024-01-16T10:00:00Z",
+  "nonce": "9f8e7d6c-4b3a-2c1d-8e7f-6a5b4c3d2e1f",
+  "status": "active",
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-2022",
+    "created": "2024-01-15T10:00:01Z",
+    "verificationMethod": "did:key:z6MkhaXgBcjvVgJKKKZo9vQqYhF8JxqB3d5hL5xK5X5x5X#z6MkhaXgBcjvVgJKKKZo9vQqYhF8JxqB3d5hL5xK5X5x5X",
+    "proofPurpose": "capabilityAssertion",
+    "proofValue": "z4sJZk..."
+  }
+}
+</pre>
+      
+      <p><strong>Field descriptions:</strong></p>
+      
+      <ul>
+        <li><code>type</code>: Always "LeaseSyncResponse".</li>
+        <li><code>capabilityId</code>: The identifier of the capability credential (matches <code>credential.id</code>).</li>
+        <li><code>capabilityHash</code>: SHA-256 hash of the canonicalized capability credential (without the proof).</li>
+        <li><code>previousLastSync</code>: The previous <code>newLastSync</code> value from the controller's request (or <code>issuanceDate</code> for initial sync).</li>
+        <li><code>newLastSync</code>: The updated timestamp assigned by the issuer. Always strictly greater than <code>previousLastSync</code>.</li>
+        <li><code>nextSyncRecommended</code>: Optional hint from the issuer about when the controller should next sync (to distribute load).</li>
+        <li><code>nonce</code>: The nonce from the corresponding sync request, to prevent replay attacks.</li>
+        <li><code>status</code>: "active" or "revoked".</li>
+        <li><code>proof</code>: Data Integrity proof with <code>proofPurpose: "capabilityAssertion"</code>.</li>
+      </ul>
+    </section>
+
+    <section id="sync-request-detailed">
+      <h3>Sync Request</h3>
+      
+      <pre class="test-vector">
+{
+  "type": "LeaseSyncRequest",
+  "capabilityId": "urn:cap:9f8e7d6c-4b3a-2c1d-8e7f-6a5b4c3d2e1f",
+  "lastKnownSync": "2024-01-15T10:00:00Z",
+  "nonce": "4b3a2c1d-8e7f-6a5b-4c3d-2e1f0a9b8c7d",
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-2022",
+    "created": "2024-01-16T09:00:00Z",
+    "verificationMethod": "did:key:z6MkhaXgBcjvVgJKKKZo9vQqYhF8JxqB3d5hL5xK5X5x5Y#z6MkhaXgBcjvVgJKKKZo9vQqYhF8JxqB3d5hL5xK5X5x5Y",
+    "proofPurpose": "capabilityInvocation",
+    "proofValue": "z7tNQp..."
+  }
+}
+</pre>
+      
+      <p><code>lastKnownSync</code> <em class="rfc2119">MUST</em> be set to the <code>newLastSync</code> value of the controller's current lease state. On first sync (no prior <code>LeaseSyncResponse</code>), it <em class="rfc2119">MUST</em> be set to the capability's <code>issuanceDate</code>.</p>
+    </section>
+
+    <section id="sync-required-response">
+      <h3>403 Sync Required Response</h3>
+      
+      <p>When a capability is STALE, verifiers <em class="rfc2119">MUST</em> return a 403 with the following body. The <code>verifierTimestamp</code> field allows the controller to detect clock drift before attempting sync.</p>
+      
+      <pre class="test-vector">
+{
+  "error": "sync_required",
+  "syncEndpoint": "https://issuer.example.com/api/v1/capabilities/sync",
+  "verifierTimestamp": "2024-01-16T10:05:00Z",
+  "reason": "Capability is in STALE state. TTL expired at 2024-01-16T10:00:00Z, within grace period until 2024-01-16T10:05:00Z."
+}
+</pre>
+    </section>
+
+    <section id="revoked-sync-response">
+      <h3>Revoked Sync Response</h3>
+      
+      <p>When the issuer has revoked the capability, it <em class="rfc2119">MUST</em> return this structure in response to any sync request. The controller and verifier <em class="rfc2119">MUST</em> cache this revocation.</p>
+      
+      <pre class="test-vector">
+{
+  "type": "LeaseSyncResponse",
+  "capabilityId": "urn:cap:9f8e7d6c-4b3a-2c1d-8e7f-6a5b4c3d2e1f",
+  "capabilityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "status": "revoked",
+  "revokedAt": "2024-01-15T15:30:00Z",
+  "reason": "Key compromise reported",
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-2022",
+    "created": "2024-01-15T15:30:01Z",
+    "verificationMethod": "did:key:...",
+    "proofPurpose": "capabilityAssertion",
+    "proofValue": "z9rMqX..."
+  }
+}
+</pre>
+    </section>
+
+    <section id="revocation-cache-entry-detailed">
+      <h3>Revocation Cache Entry</h3>
+      
+      <pre class="test-vector">
+{
+  "capabilityId": "urn:cap:9f8e7d6c-4b3a-2c1d-8e7f-6a5b4c3d2e1f",
+  "revokedAt": "2024-01-15T15:30:00Z",
+  "expiresAt": "2024-01-17T15:30:00Z",
+  "lastSeenTimestamp": "2024-01-15T14:00:00Z",
+  "proof": { ... }
+}
+</pre>
+      
+      <p>The <code>expiresAt</code> field <em class="rfc2119">MUST</em> be set to <code>max(revokedAt + TTL + GracePeriod, lastSeenTimestamp + TTL + GracePeriod)</code>. This ensures the cache entry outlives any capability instance that was valid at the time of revocation, even for verifiers that haven't recently seen the capability.</p>
+      
+      <p><strong>Rationale:</strong> If <code>expiresAt</code> were set to <code>revokedAt + TTL + GracePeriod</code> only, a verifier that last saw the capability at time <code>lastSeen</code> (where <code>lastSeen &gt; revokedAt</code>) might have a cache entry that expires before the verifier learns of the revocation through a sync attempt. Using <code>max()</code> ensures the entry persists for a full <code>T + G</code> window beyond the last time the verifier saw the capability, guaranteeing that any subsequent access attempt will hit the revocation cache.</p>
+      
+      <p>Implementations <em class="rfc2119">SHOULD</em> run periodic cleanup to remove entries where <code>now > expiresAt</code>.</p>
+    </section>
+
+    <section id="offline-mode-configuration-detailed">
+      <h3>Offline Mode Configuration</h3>
+      
+      <p>When the issuer permits offline operation, the <code>offlineMode</code> object in <code>leaseSpec</code> <em class="rfc2119">MUST</em> include:</p>
+      
+      <pre class="test-vector">
+"offlineMode": {
+  "enabled": true,
+  "maxDurationSeconds": 172800,
+  "graceMultiplier": 1.5
+}
+</pre>
+      
+      <ul>
+        <li><code>enabled</code>: Boolean indicating whether offline mode is permitted. If <code>false</code> or absent, verifiers <em class="rfc2119">MUST</em> deny access when the issuer is unreachable.</li>
+        <li><code>maxDurationSeconds</code>: Hard upper bound on offline operation duration. Verifiers <em class="rfc2119">MUST</em> enforce this absolute limit.</li>
+        <li><code>graceMultiplier</code>: Multiplier applied to <code>GracePeriod</code> when the issuer is unreachable. <em class="rfc2119">MUST NOT</em> exceed 2.0.</li>
+      </ul>
+      
+      <p>The effective offline expiry is:</p>
+      
+      <pre>offlineExpiry = min(
+  lastSync + TTL + (GracePeriod × graceMultiplier),
+  lastSync + maxDurationSeconds
+)</pre>
+      
+      <p>When <code>offlineMode.enabled</code> is <code>false</code> or the field is absent, verifiers <em class="rfc2119">MUST</em> deny access if they cannot reach the issuer. Verifiers <em class="rfc2119">MUST NOT</em> apply any offline grace extension in this case.</p>
+    </section>
+  </section>
+
+  <section id="state-machine-detailed">
+    <h2>State Machine</h2>
+    
+    <p>The capability state machine defines how capabilities transition between states over time and in response to events. Understanding these transitions is essential for implementing correct verifiers and controllers.</p>
+    
+    <section id="state-transition-table-detailed">
+      <h3>State Transition Table</h3>
+      
+      <p>The following table enumerates all possible state transitions, the events that trigger them, and the conditions that must hold:</p>
+      
+      <table class="parameter-table">
+        <thead>
+          <tr>
+            <th>Current State</th>
+            <th>Event</th>
+            <th>Next State</th>
+            <th>Condition</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>NONE (not yet issued)</th>
+            <td>ISSUE</th>
+            <td>ACTIVE</th>
+            <td>Valid issuer signature; initial <code>lastSync</code> = <code>issuanceDate</code></th>
+            <td>Issuer creates and signs capability credential</th>
+          </tr>
+          <tr>
+            <td>ACTIVE</th>
+            <td>TIME_ADVANCE</th>
+            <td>STALE</th>
+            <td><code>N > L + T + ε</code> (TTL expired, within grace)</th>
+            <td>24 hours after last sync, capability becomes stale</th>
+          </tr>
+          <tr>
+            <td>ACTIVE</th>
+            <td>SYNC_SUCCESS</th>
+            <td>ACTIVE</th>
+            <td>Valid sync response received; <code>lastSync</code> updated</th>
+            <td>Controller syncs before TTL expires</th>
+          </tr>
+          <tr>
+            <td>ACTIVE</th>
+            <td>REVOKE</th>
+            <td>REVOKED</th>
+            <td>Valid revocation proof received</th>
+            <td>Issuer revokes capability</th>
+          </tr>
+          <tr>
+            <td>STALE</th>
+            <td>SYNC_SUCCESS</th>
+            <td>ACTIVE</th>
+            <td>Valid sync response received within grace period</th>
+            <td>Controller syncs after TTL expires but before grace ends</th>
+          </tr>
+          <tr>
+            <td>STALE</th>
+            <td>TIME_ADVANCE</th>
+            <td>EXPIRED</th>
+            <td><code>N > L + T + G + ε</code> (grace period elapsed)</th>
+            <td>5 minutes after STALE, capability expires</th>
+          </tr>
+          <tr>
+            <td>EXPIRED</th>
+            <td>RE_ISSUE</th>
+            <td>ACTIVE</th>
+            <td>New capability credential issued by issuer</th>
+            <td>Issuer issues new capability with fresh issuance date</th>
+          </tr>
+          <tr>
+            <td>ANY</th>
+            <td>FUTURE_DETECT</th>
+            <td>FUTURE</th>
+            <td><code>N &lt; L − Δ</code> (lastSync too far in future)</th>
+            <td>Verifier detects timestamp in future beyond Δ</th>
+          </tr>
+          <tr>
+            <td>REVOKED</th>
+            <td>—</th>
+            <td>REVOKED</th>
+            <td>Terminal state</th>
+            <td>No further transitions; re-issuance required</th>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="state-diagram-detailed">
+      <h3>State Diagram</h3>
+      
+      <div class="state-diagram">
+        <pre>
+                                    ┌─────────────────────────────────────┐
+                                    │                                     │
+                                    ▼                                     │
+                         Issue/Delegate                                   │
+    ┌──────┐  ─────────────────────────────►  ┌──────────┐                │
+    │ NONE │                                   │  ACTIVE  │ ◄──────────────┘
+    └──────┘                                   └──────────┘                │
+                                                    │                      │
+                                          N > L+T+ε │               SYNC_SUCCESS
+                                                    ▼                      │
+                                               ┌─────────┐                 │
+                                               │  STALE  │ ────────────────┘
+                                               └─────────┘                 │
+                                                    │                      │
+                                       N > L+T+G+ε │                      │
+                                                    ▼                      │
+                                               ┌─────────┐                 │
+                                               │ EXPIRED │                 │
+                                               └─────────┘                 │
+                                                    │                      │
+                                              RE_ISSUE │                   │
+                                                    ▼                      │
+                                               ┌─────────┐                 │
+                                               │  ACTIVE │ ────────────────┘
+                                               └─────────┘
+
+    From ACTIVE or STALE:  REVOKE ──► REVOKED (terminal)
+    From ANY:              N < L−Δ ──► FUTURE (reject)
+
+    LEGEND:
+    ───► Normal transition
+    ◄──► Bidirectional (sync success returns to ACTIVE)
+    N = current time, L = lastSync, T = TTL, G = GracePeriod, ε = clockTolerance, Δ = futureSkewBound
+</pre>
+      </div>
+      
+      <p><strong>Key observations about the state diagram:</strong></p>
+      
+      <ul>
+        <li>The ACTIVE state is the only state from which access is granted without issuer contact. Both STALE and FUTURE require additional steps (sync or clock correction).</li>
+        <li>SYNC_SUCCESS is the only event that can transition from STALE back to ACTIVE, demonstrating the liveness property.</li>
+        <li>REVOKED is a terminal state — once revoked, a capability cannot become ACTIVE again without re-issuance.</li>
+        <li>FUTURE is a transient state detected during verification; it does not persist in the lease state cache.</li>
+      </ul>
+    </section>
+  </section>
+
+  <section id="protocol-flows-detailed">
+    <h2>Protocol Flows</h2>
+    
+    <p>The protocol flows illustrate the interactions between Controllers, Verifiers, and Issuers in various scenarios. All messages are cryptographically signed and include appropriate proofs.</p>
+    
+    <section id="normal-operation">
+      <h3>Normal Operation (ACTIVE)</h3>
+      
+      <div class="protocol-flow">
+        <pre>
+Controller          Verifier            Issuer
+    │                   │                  │
+    │  Access request   │                  │
+    │  (capability +    │                  │
+    │   latest sync     │                  │
+    │   response)       │                  │
+    │──────────────────►│                  │
+    │                   │                  │
+    │                   │ 1. Resolve       │
+    │                   │    EffectiveState│
+    │                   │    from cache    │
+    │                   │                  │
+    │                   │ 2. Check N ≤ L+T+ε│
+    │                   │    → ACTIVE      │
+    │                   │                  │
+    │  200 OK           │                  │
+    │◄──────────────────│                  │
+    │                   │                  │
+    │  [Resource access │                  │
+    │   granted]        │                  │
+</pre>
+      </div>
+      
+      <p><strong>Description:</strong> In normal operation, the controller presents both the capability credential and the latest <code>LeaseSyncResponse</code>. The verifier checks that the capability is in ACTIVE state (current time within TTL of lastSync) and grants access. No issuer contact is required, enabling low-latency operation.</p>
+    </section>
+
+    <section id="stale-state-flow">
+      <h3>STALE State Flow (Sync Required)</h3>
+      
+      <div class="protocol-flow">
+        <pre>
+Controller          Verifier            Issuer
+    │                   │                  │
+    │  Access request   │                  │
+    │──────────────────►│                  │
+    │                   │                  │
+    │                   │ State → STALE    │
+    │                   │ (TTL expired,    │
+    │                   │  within grace)   │
+    │                   │                  │
+    │  403 + verifier   │                  │
+    │  timestamp        │                  │
+    │◄──────────────────│                  │
+    │                   │                  │
+    │  Detect drift     │                  │
+    │  (compare         │                  │
+    │   timestamps)     │                  │
+    │                   │                  │
+    │  LeaseSyncRequest │                  │
+    │  (with nonce)     │                  │
+    │─────────────────────────────────────►│
+    │                   │                  │
+    │                   │                  │ 1. Verify proof
+    │                   │                  │ 2. Check controller
+    │                   │                  │ 3. Check parent ACTIVE
+    │                   │                  │ 4. Issue new timestamp
+    │                   │                  │
+    │  LeaseSyncResponse│                  │
+    │  (newLastSync)    │                  │
+    │◄─────────────────────────────────────│
+    │                   │                  │
+    │  Update cache     │                  │
+    │                   │                  │
+    │  Retry request    │                  │
+    │  (updated lease   │                  │
+    │   state)          │                  │
+    │──────────────────►│                  │
+    │                   │                  │
+    │                   │ State → ACTIVE   │
+    │                   │ (new lastSync    │
+    │                   │  within TTL)     │
+    │                   │                  │
+    │  200 OK           │                  │
+    │◄──────────────────│                  │
+</pre>
+      </div>
+      
+      <p><strong>Description:</strong> When a capability is STALE, the verifier returns a 403 response with the sync endpoint and its current timestamp. The controller detects clock drift (if any), then sends a sync request to the issuer. The issuer verifies the request, updates the lease state, and returns a new <code>LeaseSyncResponse</code>. The controller retries the original request with the updated lease state, which is now ACTIVE.</p>
+    </section>
+
+    <section id="proactive-sync">
+      <h3>Proactive Sync Flow (RECOMMENDED)</h3>
+      
+      <div class="protocol-flow">
+        <pre>
+Controller                              Issuer
+    │                                      │
+    │  Calculate sync time                 │
+    │  = TTL × syncLeadTime ± jitter       │
+    │                                      │
+    │  [wait for scheduled time]           │
+    │                                      │
+    │  LeaseSyncRequest                    │
+    │  (proactive, before TTL expiry)      │
+    │─────────────────────────────────────►│
+    │                                      │
+    │                                      │ Verify, update state
+    │                                      │
+    │  LeaseSyncResponse                   │
+    │  (newLastSync = now)                 │
+    │◄─────────────────────────────────────│
+    │                                      │
+    │  Update lease state cache            │
+    │                                      │
+    │  [Capability remains ACTIVE          │
+    │   without service interruption]      │
+</pre>
+      </div>
+      
+      <p><strong>Description:</strong> Proactive sync is the recommended pattern. The controller calculates a sync time before TTL expiration (e.g., at 80% of TTL) with jitter to avoid thundering herds. By syncing proactively, the controller ensures the capability never enters the STALE state, eliminating the first-request latency penalty.</p>
+    </section>
+
+    <section id="offline-mode-flow">
+      <h3>Offline Mode Flow</h3>
+      
+      <div class="protocol-flow">
+        <pre>
+Controller          Verifier            Issuer
+    │                   │                  │
+    │  Access request   │                  │
+    │──────────────────►│                  │
+    │                   │                  │
+    │                   │─── Sync check ──►│ [unreachable]
+    │                   │                  │
+    │                   │ Check offline    │
+    │                   │ config:          │
+    │                   │ • enabled? yes   │
+    │                   │ • within         │
+    │                   │   maxDuration?   │
+    │                   │                  │
+    │  200 OK           │                  │
+    │  (offline warning │                  │
+    │   header)         │                  │
+    │◄──────────────────│                  │
+    │                   │                  │
+    │  Background retry │                  │
+    │  (exp. backoff)   │                  │
+    │─────────────────────────────────────►│
+    │                   │                  │
+    │                   │                  │ [eventually reachable]
+    │                   │                  │
+    │  LeaseSyncResponse│                  │
+    │◄─────────────────────────────────────│
+</pre>
+      </div>
+      
+      <p><strong>Description:</strong> When offline mode is enabled and the issuer is unreachable, the verifier grants access with a warning header, provided the capability is within the offline expiry window (<code>lastSync + TTL + (GracePeriod × graceMultiplier)</code> and <code>maxDurationSeconds</code> has not been exceeded). The controller continues background sync attempts with exponential backoff.</p>
+    </section>
+
+    <section id="multi-device-sync">
+      <h3>Multi-Device Sync</h3>
+      
+      <div class="protocol-flow">
+        <pre>
+Device A          Device B          Issuer
+    │                 │                 │
+    │  Sync at t=10   │                 │
+    │─────────────────────────────────►│
+    │                 │                 │
+    │                 │                 │ Record: lastSync=10
+    │                 │                 │ for capability C
+    │  Response (L=10)│                 │
+    │◄─────────────────────────────────│
+    │                 │                 │
+    │                 │  Sync at t=12   │
+    │                 │  prevSync=10    │
+    │                 │────────────────►│
+    │                 │                 │
+    │                 │                 │ Accept (prevSync in history)
+    │                 │                 │ Record: lastSync=12
+    │                 │                 │
+    │                 │  Response (L=12)│
+    │                 │◄────────────────│
+    │                 │                 │
+    │  Access at t=13 │                 │
+    │  presents L=10  │                 │
+    │────────────────►│                 │
+    │                 │                 │
+    │  [Verifier: L=10 is valid,        │
+    │   within TTL, grants access]      │
+</pre>
+      </div>
+      
+      <p><strong>Description:</strong> Multi-device scenarios are explicitly supported. Each device maintains its own lease state cache and syncs independently. The issuer remembers previously issued <code>newLastSync</code> values for at least <code>TTL + GracePeriod</code>. When Device B syncs with <code>previousLastSync=10</code> (issued to Device A), the issuer accepts the request because 10 is in its history. Device A continues to use its own lease state (L=10) without needing to know about Device B's newer sync.</p>
+    </section>
+  </section>
+
+  <section id="cryptographic-proofs">
+    <h2>Cryptographic Proofs</h2>
+    
+    <p>Lease-CAP uses W3C Data Integrity proofs with the Ed25519 cryptosuite for all signed messages. This section defines the proof purposes, generation process, and verification requirements.</p>
+    
+    <section id="proof-types">
+      <h3>Proof Types and Purposes</h3>
+      
+      <table class="parameter-table">
+        <thead>
+          <tr><th>Proof Purpose</th><th>Used By</th><th>Signs</th><th>When Used</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>capabilityDelegation</code></th>
+            <td>Issuer</th>
+            <td>Capability credential at issuance</th>
+            <td>When creating a new capability</th>
+          </tr>
+          <tr>
+            <td><code>capabilityInvocation</code></th>
+            <td>Controller</th>
+            <td>Sync request; resource access request (if signed)</th>
+            <td>When requesting sync or accessing resources</th>
+          </tr>
+          <tr>
+            <td><code>capabilityAssertion</code></th>
+            <td>Issuer</th>
+            <td><code>LeaseSyncResponse</code>; revocation notices</th>
+            <td>When responding to sync requests or revoking capabilities</th>
+          </tr>
+        </tbody>
+      </table>
+      
+      <p><strong>Key rotation note:</strong> Key rotation is not explicitly defined as a proof purpose in this version. Implementations requiring key rotation <em class="rfc2119">SHOULD</em> re-issue the capability with a new <code>verificationMethod</code> rather than attempting to rotate keys in place.</p>
+    </section>
+
+    <section id="proof-generation">
+      <h3>Proof Generation</h3>
+      
+      <p>The following algorithm demonstrates proof generation for any document:</p>
+      
+      <pre class="algorithm">
+function generateProof(
+  document: object,
+  privateKey: CryptoKey,
+  purpose: ProofPurpose,
+  verificationMethod: string
+): Proof {
+  // Remove any existing proof field
+  const docWithoutProof = { ...document, proof: undefined };
+  
+  // Canonicalize the document
+  const canonicalDoc = canonicalize(docWithoutProof);
+  
+  // Create proof configuration
+  const proofConfig = {
+    type: "DataIntegrityProof",
+    cryptosuite: "eddsa-2022",
+    created: new Date().toISOString(),
+    verificationMethod: verificationMethod,
+    proofPurpose: purpose,
+    proofValue: ""
+  };
+  
+  // Canonicalize proof config without the proofValue
+  const canonicalProofConfig = canonicalize({
+    ...proofConfig,
+    proofValue: undefined
+  });
+  
+  // Hash the concatenation
+  const toSign = hash(canonicalProofConfig + canonicalDoc);
+  
+  // Sign and encode
+  const signature = await sign(privateKey, toSign);
+  proofConfig.proofValue = base58btc(signature);
+  
+  return proofConfig;
+}
+</pre>
+    </section>
+
+    <section id="proof-verification">
+      <h3>Proof Verification</h3>
+      
+      <pre class="algorithm">
+async function verifyProof(
+  document: object,
+  proof: Proof,
+  publicKey: CryptoKey
+): Promise&lt;boolean&gt; {
+  // Remove proof from document for canonicalization
+  const docWithoutProof = { ...document, proof: undefined };
+  const canonicalDoc = canonicalize(docWithoutProof);
+  
+  // Create proof config without proofValue
+  const proofConfig = { ...proof, proofValue: undefined };
+  const canonicalProofConfig = canonicalize(proofConfig);
+  
+  // Hash the concatenation
+  const toVerify = hash(canonicalProofConfig + canonicalDoc);
+  
+  // Verify signature
+  const signature = base58btc.decode(proof.proofValue);
+  return verify(publicKey, toVerify, signature);
+}
+</pre>
+    </section>
+  </section>
+
+  <section id="verification-algorithms-detailed">
+    <h2>Verification Algorithms</h2>
+    
+    <p>This section defines the core verification algorithms that all conforming verifiers <em class="rfc2119">MUST</em> implement. These algorithms are referenced throughout the specification.</p>
+    
+    <section id="algorithm-get-effective-lease-state-detailed">
+      <h3>Algorithm 11.1: GetEffectiveLeaseState</h3>
+      
+      <div class="algorithm">
+        <p><strong>Purpose:</strong> Retrieve the latest valid lease state for a capability from the cache, falling back to initial state if none exists.</p>
+        
+        <p><strong>Inputs:</strong></p>
+        <ul>
+          <li><code>capabilityId</code> — identifier of the capability</li>
+          <li><code>capability</code> — the capability credential (for <code>issuanceDate</code> and hash verification)</li>
+          <li><code>leaseStateCache</code> — cache of received <code>LeaseSyncResponse</code> objects</li>
+          <li><code>issuerKey</code> — public key for verifying sync responses</li>
+        </ul>
+        
+        <p><strong>Output:</strong> The effective lease state (lastSync, previousLastSync, status, capabilityHash)</p>
+        
+        <p><strong>Steps:</strong></p>
+        <ol>
+          <li>Let <code>candidates</code> = all entries in <code>leaseStateCache</code> for <code>capabilityId</code>.</li>
+          <li>Sort <code>candidates</code> by <code>newLastSync</code> descending (most recent first).</li>
+          <li>For each <code>candidate</code> in sorted order:
+            <ol type="a">
+              <li>If <code>verifyProof(candidate, candidate.proof, issuerKey)</code> fails → discard, continue.</li>
+              <li>If <code>H(canonicalize(capability)) ≠ candidate.capabilityHash</code> → discard, continue.</li>
+              <li>Return <code>candidate</code> as the effective lease state.</li>
+            </ol>
+          </li>
+          <li>If no valid candidate found, return initial state:
+            <ul>
+              <li><code>newLastSync</code> = <code>capability.issuanceDate</code></li>
+              <li><code>previousLastSync</code> = null</li>
+              <li><code>status</code> = "active"</li>
+              <li><code>capabilityHash</code> = <code>H(canonicalize(capability))</code></li>
+            </ul>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="algorithm-verify-capability-detailed">
+      <h3>Algorithm 11.2: VerifyCapability</h3>
+      
+      <div class="algorithm">
+        <p><strong>Purpose:</strong> Evaluate a capability's current state and determine whether access should be granted.</p>
+        
+        <p><strong>Inputs:</strong></p>
+        <ul>
+          <li><code>capability</code> — the capability credential</li>
+          <li><code>leaseState</code> — result of Algorithm 11.1</li>
+          <li><code>controllerDid</code> — DID of the controller presenting the capability</li>
+          <li><code>now</code> — current time (NTP-synchronized wall-clock, milliseconds since epoch)</li>
+          <li><code>revocationCache</code> — cache of revocation records</li>
+          <li><code>issuerKey</code> — public key for verifying capability proof</li>
+        </ul>
+        
+        <p><strong>Output:</strong> VerificationResult <code>{ status, result, reason?, syncEndpoint?, verifierTimestamp? }</code></p>
+        
+        <p><strong>Steps:</strong></p>
+        <ol>
+          <li><strong>Check revocation cache:</strong> If <code>revocationCache</code> contains <code>capability.id</code> with <code>expiresAt > now</code>:
+            <br>→ Return <code>{ status: "REVOKED", result: "denied", reason: "revoked at " + revokedAt }</code>.</li>
+          
+          <li><strong>Verify capability proof:</strong> If <code>verifyProof(capability, capability.proof, issuerKey)</code> fails:
+            <br>→ Return <code>{ status: "INVALID", result: "denied", reason: "invalid capability proof" }</code>.</li>
+          
+          <li><strong>Verify controller:</strong> If <code>capability.credentialSubject.id ≠ controllerDid</code>:
+            <br>→ Return <code>{ status: "INVALID", result: "denied", reason: "controller mismatch" }</code>.</li>
+          
+          <li><strong>Check lease state revocation:</strong> If <code>leaseState.status == "revoked"</code>:
+            <br>→ Return <code>{ status: "REVOKED", result: "denied", reason: "revoked via lease state" }</code>.</li>
+          
+          <li><strong>Extract parameters:</strong>
+            <ul>
+              <li><code>L</code> = <code>leaseState.newLastSync</code> as milliseconds since epoch</li>
+              <li><code>T</code> = <code>capability.leaseSpec.ttl × 1000</code></li>
+              <li><code>G</code> = <code>capability.leaseSpec.gracePeriod × 1000</code></li>
+              <li><code>ε</code> = <code>clockTolerance</code> (default 5000 ms)</li>
+              <li><code>Δ</code> = <code>capability.leaseSpec.futureSkewBound</code> (default 5000 ms)</li>
+              <li><code>N</code> = <code>now</code></li>
+            </ul>
+          </li>
+          
+          <li><strong>FUTURE check:</strong> If <code>N &lt; L − Δ</code>:
+            <br>→ Return <code>{ status: "FUTURE", result: "denied", reason: "lastSync in future beyond Δ" }</code>.</li>
+          
+          <li><strong>ACTIVE check:</strong> If <code>N ≤ L + T + ε</code>:
+            <br>→ Return <code>{ status: "ACTIVE", result: "granted" }</code>.</li>
+          
+          <li><strong>STALE check:</strong> If <code>N ≤ L + T + G + ε</code>:
+            <br>→ Return <code>{ status: "STALE", result: "sync_required", syncEndpoint: leaseSpec.syncEndpoint, verifierTimestamp: now }</code>.</li>
+          
+          <li><strong>EXPIRED:</strong> Return <code>{ status: "EXPIRED", result: "denied", reason: "TTL and grace period elapsed" }</code>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="algorithm-validate-sync-response-detailed">
+      <h3>Algorithm 11.3: ValidateSyncResponse</h3>
+      
+      <div class="algorithm">
+        <p><strong>Purpose:</strong> Validate a sync response from the issuer and update the lease state cache if valid.</p>
+        
+        <p><strong>Inputs:</strong></p>
+        <ul>
+          <li><code>response</code> — the sync response from the issuer</li>
+          <li><code>capability</code> — the capability credential</li>
+          <li><code>localLeaseState</code> — the controller's current effective lease state</li>
+          <li><code>requestNonce</code> — the nonce sent in the corresponding sync request</li>
+          <li><code>now</code> — current time (milliseconds since epoch)</li>
+          <li><code>clockTolerance</code> — ε in milliseconds</li>
+          <li><code>issuerHistory</code> — set of previously issued <code>newLastSync</code> values for this capability</li>
+          <li><code>issuerKey</code> — public key for verifying response proof</li>
+        </ul>
+        
+        <p><strong>Output:</strong> <code>{ valid: boolean, leaseState?: LeaseState, revoked?: boolean }</code></p>
+        
+        <p><strong>Steps:</strong></p>
+        <ol>
+          <li>If <code>verifyProof(response, response.proof, issuerKey)</code> fails → Return <code>{ valid: false, reason: "invalid proof" }</code>.</li>
+          <li>If <code>response.capabilityId ≠ capability.id</code> → Return <code>{ valid: false, reason: "capability ID mismatch" }</code>.</li>
+          <li>If <code>response.capabilityHash ≠ H(canonicalize(capability))</code> → Return <code>{ valid: false, reason: "capability hash mismatch" }</code>.</li>
+          <li>Let <code>prevSync</code> = <code>localLeaseState.newLastSync</code> (or <code>issuanceDate</code> if initial state).
+            <br>If <code>response.previousLastSync ≠ prevSync</code>:
+            <br>→ This is a multi-device scenario. Accept if <code>response.previousLastSync</code> is a valid previously-issued <code>newLastSync</code> for this capability (i.e., it appears in <code>issuerHistory</code> or equals <code>issuanceDate</code>). Otherwise return <code>{ valid: false, reason: "previousLastSync mismatch" }</code>.</li>
+          <li>If <code>response.newLastSync ≤ response.previousLastSync</code> → Return <code>{ valid: false, reason: "timestamp not strictly increasing" }</code>.</li>
+          <li>If <code>response.nonce ≠ requestNonce</code> → Return <code>{ valid: false, reason: "nonce mismatch" }</code>.</li>
+          <li>If <code>response.newLastSync</code> as epoch ms <code>> now + clockTolerance</code> → Return <code>{ valid: false, reason: "newLastSync in future beyond tolerance" }</code>.</li>
+          <li>If <code>response.status == "revoked"</code> → Return <code>{ valid: true, revoked: true }</code>.</li>
+          <li>Return <code>{ valid: true, leaseState: responseAsLeaseState(response) }</code>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="algorithm-verify-delegation-chain-detailed">
+      <h3>Algorithm 11.4: VerifyDelegationChain</h3>
+      
+      <div class="algorithm">
+        <p><strong>Purpose:</strong> Verify a full delegation chain from root to leaf capability, checking both cryptographic proofs and lease attenuation.</p>
+        
+        <p><strong>Inputs:</strong></p>
+        <ul>
+          <li><code>chain</code> — ordered list of capabilities, root first</li>
+          <li><code>leaseStates</code> — map of capabilityId → effective lease state (from Algorithm 11.1)</li>
+          <li><code>now</code> — current time (ms since epoch)</li>
+          <li><code>controllerDid</code> — DID of the presenting controller</li>
+          <li><code>revocationCache</code> — revocation cache</li>
+          <li><code>maxDepth</code> — maximum allowed delegation depth (default 5)</li>
+        </ul>
+        
+        <p><strong>Output:</strong> VerificationResult for the leaf capability</p>
+        
+        <p><strong>Steps:</strong></p>
+        <ol>
+          <li>If <code>chain.length > maxDepth</code> → Return <code>{ status: "INVALID", result: "denied", reason: "delegation chain exceeds max depth" }</code>.</li>
+          
+          <li>For each capability <code>cap</code> at index <code>i</code> in <code>chain</code>:
+            <ol type="a">
+              <li>Let <code>state</code> = <code>leaseStates[cap.id]</code> or initial state (from Algorithm 11.1).</li>
+              <li>Let <code>controllerToCheck</code> = <code>chain[i+1].issuer</code> if <code>i &lt; chain.length − 1</code>, else <code>controllerDid</code>.</li>
+              <li>Let <code>result</code> = <code>VerifyCapability(cap, state, controllerToCheck, now, revocationCache)</code> (Algorithm 11.2).</li>
+              <li>If <code>result.status ≠ "ACTIVE"</code> → Return <code>result</code> (chain fails at position <code>i</code>).</li>
+              <li>If <code>i > 0</code>:
+                <ul>
+                  <li>Verify delegation continuity: The issuer of <code>cap</code> must be authorized by the previous capability. Check that <code>cap.issuer</code> resolves to a DID controlled by <code>chain[i−1].credentialSubject.id</code> (or is exactly that DID).</li>
+                  <li>Verify lease attenuation: <code>cap.leaseSpec.ttl + cap.leaseSpec.gracePeriod ≤ chain[i−1].leaseSpec.ttl + chain[i−1].leaseSpec.gracePeriod</code>.</li>
+                  <li>If either check fails → Return <code>{ status: "INVALID", result: "denied", reason: "delegation chain integrity violation at position " + i }</code>.</li>
+                </ul>
+              </li>
+            </ol>
+          </li>
+          
+          <li>Return <code>{ status: "ACTIVE", result: "granted" }</code>.</li>
+        </ol>
+      </div>
+    </section>
+  </section>
+
+  <section id="didcomm-integration">
+    <h2>DIDComm Integration</h2>
+    
+    <p>Lease-CAP can be integrated with DIDComm for agent-to-agent communication. This section provides guidance on message wrapping, asynchronous handling, and mediator support.</p>
+    
+    <section id="message-wrapping">
+      <h3>Message Wrapping</h3>
+      
+      <p>Lease-CAP sync messages <em class="rfc2119">SHOULD</em> be wrapped in DIDComm envelopes for agent-to-agent communication:</p>
+      
+      <pre class="test-vector">
+{
+  "id": "1234567890",
+  "typ": "application/didcomm-plain+json",
+  "type": "https://didcomm.org/lease-cap/1.0/sync",
+  "from": "did:key:controller",
+  "to": "did:key:issuer",
+  "created_time": 1705312800,
+  "expires_time": 1705316400,
+  "body": {
+    "type": "LeaseSyncRequest",
+    "capabilityId": "urn:cap:9f8e7d6c...",
+    "lastKnownSync": "2024-01-15T10:00:00Z",
+    "nonce": "4b3a2c1d-8e7f-6a5b"
+  },
+  "attachments": [
+    { "id": "proof-1", "data": { ... } }
+  ]
+}
+</pre>
+    </section>
+
+    <section id="asynchronous-sync">
+      <h3>Asynchronous Sync Handling</h3>
+      
+      <p>In high-latency or asynchronous DIDComm environments:</p>
+      
+      <ol>
+        <li>Controllers <em class="rfc2119">SHOULD</em> initiate sync proactively before TTL expiration to account for message delivery latency.</li>
+        <li>Verifiers <em class="rfc2119">SHOULD</em> accept sync responses with <code>created</code> timestamps up to <code>clockTolerance</code> after the request was queued.</li>
+        <li>Issuers <em class="rfc2119">SHOULD</em> support async response queues for offline controllers.</li>
+      </ol>
+      
+      <p><strong>DIDComm-Specific Timing Parameters:</strong></p>
+      
+      <table class="parameter-table">
+        <thead>
+          <tr><th>Parameter</th><th>Value</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>AsyncGraceMultiplier</code></th>
+            <td>1.5</th>
+            <td>Extended grace for async response delivery (applies to message latency, not capability grace)</th>
+          </tr>
+          <tr>
+            <td><code>MaxAsyncLatency</code></th>
+            <td>30000 ms</th>
+            <td>Maximum expected round-trip time for DIDComm messages</th>
+          </tr>
+          <tr>
+            <td><code>RetryBackoffBase</code></th>
+            <td>2000 ms</th>
+            <td>Base delay for async retries</th>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="note">
+        <p><strong>Important Distinction:</strong> <code>AsyncGraceMultiplier</code> applies to the delivery latency of the DIDComm message itself, not to the capability grace period. It is distinct from <code>offlineMode.graceMultiplier</code>, which governs how long a verifier tolerates issuer unreachability.</p>
+      </div>
+    </section>
+
+    <section id="mediator-support">
+      <h3>Mediator Support</h3>
+      
+      <ol>
+        <li>Sync requests <em class="rfc2119">MAY</em> be sent through DIDComm mediators.</li>
+        <li>Mediators <em class="rfc2119">MUST NOT</em> modify lease state, proofs, or timestamps.</li>
+        <li>Verifiers <em class="rfc2119">MUST</em> verify that sync responses carry a valid proof from the issuer's DID, not from the mediator.</li>
+        <li>Controllers <em class="rfc2119">SHOULD</em> use end-to-end encryption when routing through mediators.</li>
+      </ol>
+    </section>
+  </section>
+
+  <section id="compatibility">
+    <h2>Compatibility with Existing Systems</h2>
+    
+    <p>Lease-CAP is designed as a temporal control layer that can be applied to existing capability-based authorization systems without modification to their core models.</p>
+    
+    <section id="wrapping-ucan">
+      <h3>Wrapping UCAN</h3>
+      
+      <p>Lease-CAP can be applied to UCAN delegation chains by adding a lease layer:</p>
+      
+      <pre class="test-vector">
+{
+  "ucan": { ... },  // Original UCAN token
+  "lease": {
+    "capabilityId": "urn:cap:...",
+    "syncEndpoint": "https://issuer.example.com/sync",
+    "leaseSpec": { 
+      "ttl": 86400, 
+      "gracePeriod": 300 
+    },
+    "lastSync": "2024-01-15T10:00:00Z"  // From sync response
+  }
+}
+</pre>
+      
+      <p>The lease layer adds liveness guarantees to UCAN's delegation model. The UCAN's <code>exp</code> field <em class="rfc2119">SHOULD</em> be set to <code>issuanceDate + maxLifetime</code> and treated as an absolute upper bound, while lease state provides fine-grained liveness control.</p>
+    </section>
+
+    <section id="extending-zcap-ld">
+      <h3>Extending ZCAP-LD</h3>
+      
+      <p>ZCAP-LD root capabilities can be enhanced with a lease specification:</p>
+      
+      <pre class="test-vector">
+{
+  "@context": [
+    "https://w3id.org/zcap/v1", 
+    "https://w3id.org/lease-cap/v1"
+  ],
+  "id": "urn:zcap:root:...",
+  "controller": "did:key:...",
+  "invocationTarget": "...",
+  "leaseSpec": {
+    "ttl": 86400,
+    "gracePeriod": 300,
+    "syncEndpoint": "https://issuer.example.com/sync"
+  }
+}
+</pre>
+    </section>
+  </section>
+
+  <section id="implementation-guidance-detailed">
+    <h2>Implementation Guidance</h2>
+    
+    <p>This section provides practical guidance for implementers, including parameter selection, sync strategies, and error handling.</p>
+    
+    <section id="parameter-selection-guide">
+      <h3>Parameter Selection Guide</h3>
+      
+      <p>The following table provides recommended parameter values for different use cases:</p>
+      
+      <table class="parameter-table">
+        <thead>
+          <tr>
+            <th>Use Case</th>
+            <th>TTL</th>
+            <th>GracePeriod</th>
+            <th>SyncLeadTime</th>
+            <th>Jitter</th>
+            <th>MaxLifetime</th>
+            <th>OfflineMode</th>
+            <th>Δ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>High-frequency API</th>
+            <td>3600 s (1 hour)</th>
+            <td>60 s</th>
+            <td>0.8</th>
+            <td>10%</th>
+            <td>7 days</th>
+            <td>Disabled</th>
+            <td>5 s</th>
+          </tr>
+          <tr>
+            <td>Web application</th>
+            <td>86400 s (24 hours)</th>
+            <td>300 s (5 minutes)</th>
+            <td>0.8</th>
+            <td>10%</th>
+            <td>30 days</th>
+            <td>Optional</th>
+            <td>5 s</th>
+          </tr>
+          <tr>
+            <td>Financial transactions</th>
+            <td>7200 s (2 hours)</th>
+            <td>120 s</th>
+            <td>0.7</th>
+            <td>5%</th>
+            <td>14 days</th>
+            <td>Disabled</th>
+            <td>1 s</th>
+          </tr>
+          <tr>
+            <td>IoT devices</th>
+            <td>604800 s (7 days)</th>
+            <td>3600 s (1 hour)</th>
+            <td>0.7</th>
+            <td>15%</th>
+            <td>90 days</th>
+            <td>Enabled (1.5×)</th>
+            <td>30 s</th>
+          </tr>
+          <tr>
+            <td>Satellite/cross-border</th>
+            <td>86400 s (24 hours)</th>
+            <td>600 s (10 minutes)</th>
+            <td>0.6</th>
+            <td>10%</th>
+            <td>60 days</th>
+            <td>Enabled (1.5×)</th>
+            <td>30 s</th>
+          </tr>
+        </tbody>
+      </table>
+      
+      <p><strong>Parameter rationale:</strong></p>
+      <ul>
+        <li><strong>TTL</strong> balances security (shorter is better) against operational overhead (longer reduces sync frequency).</li>
+        <li><strong>GracePeriod</strong> should be long enough to accommodate expected network latency but short enough to bound the stale window.</li>
+        <li><strong>SyncLeadTime</strong> of 0.8 means sync at 80% of TTL, providing a safety margin.</li>
+        <li><strong>Jitter</strong> of 10-15% prevents thundering herds.</li>
+      </ul>
+    </section>
+
+    <section id="sync-strategies">
+      <h3>Sync Strategies</h3>
+      
+      <table class="parameter-table">
+        <thead>
+          <tr><th>Strategy</th><th>Description</th><th>Latency</th><th>Privacy</th><th>Recommended For</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Proactive</th>
+            <td>Sync before TTL expires</th>
+            <td>Zero (no sync delay on access)</th>
+            <td>Medium (regular sync patterns)</th>
+            <td>Most use cases</th>
+          </tr>
+          <tr>
+            <td>On-demand</th>
+            <td>Sync on STALE response from verifier</th>
+            <td>First request delayed</th>
+            <td>High (sync only when needed)</th>
+            <td>High-latency environments, privacy-sensitive</th>
+          </tr>
+          <tr>
+            <td>Hybrid</th>
+            <td>Proactive with on-demand fallback</th>
+            <td>Near-zero</th>
+            <td>Medium</th>
+            <td>Production systems</th>
+          </tr>
+          <tr>
+            <td>Batch</th>
+            <td>Multiple capabilities synced together</th>
+            <td>Zero (if scheduled proactively)</th>
+            <td>High (reduces correlation)</th>
+            <td>Many capabilities per controller</th>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="error-reference">
+      <h3>Error Reference</h3>
+      
+      <table class="parameter-table">
+        <thead>
+          <tr><th>Code</th><th>Retryable</th><th>Cause</th><th>Controller Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>INVALID_PROOF</code></td><td>No</td><td>Signature verification failed</td><td>Check key material; re-issue capability</td></tr>
+          <tr><td><code>CAPABILITY_NOT_FOUND</code></td><td>No</td><td>Unknown capabilityId</td><td>Verify capability ID; request re-issuance</td></tr>
+          <tr><td><code>CAPABILITY_REVOKED</code></td><td>No</td><td>Issuer has revoked this capability</td><td>Request new capability</td></tr>
+          <tr><td><code>CAPABILITY_HASH_MISMATCH</code></td><td>No</td><td>Lease state does not match presented credential</td><td>Obtain correct sync response for this capability</td></tr>
+          <tr><td><code>RATE_LIMITED</code></td><td>Yes (after retryAfter)</td><td>Too many sync requests</td><td>Wait for retryAfter seconds; implement backoff</td></tr>
+          <tr><td><code>SYNC_REQUIRED</code></td><td>Yes (after sync)</td><td>Capability is STALE</td><td>Perform sync and retry</td></tr>
+          <tr><td><code>EXPIRED</code></td><td>No</td><td>TTL + GracePeriod elapsed</td><td>Request re-issuance</td></tr>
+          <tr><td><code>FUTURE_TIMESTAMP</code></td><td>No</td><td>lastSync is beyond futureSkewBound</td><td>Check system clock; obtain correct sync response</td></tr>
+          <tr><td><code>PARENT_NOT_ACTIVE</code></td><td>No</td><td>Parent capability is STALE or EXPIRED</td><td>Sync parent first, then child</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="audit-logging">
+      <h3>Audit Logging</h3>
+      
+      <p>Verifiers <em class="rfc2119">SHOULD</em> log the following for each verification event:</p>
+      
+      <pre class="test-vector">
+interface AuditEvent {
+  timestamp: string;           // ISO 8601 timestamp
+  capabilityId: string;        // Capability identifier
+  capabilityHash: string;      // Hash of capability credential
+  controllerDid: string;       // Controller DID
+  action: 'invoke' | 'sync' | 'revoke' | 'expire' | 'offline_grant';
+  result: 'granted' | 'denied' | 'sync_required' | 'granted_offline';
+  stateAtTime: 'ACTIVE' | 'STALE' | 'EXPIRED' | 'REVOKED' | 'FUTURE' | 'INVALID';
+  syncLatencyMs?: number;      // For sync operations
+  offlineRemainingSeconds?: number;  // For offline grants
+  clockDriftMs?: number;       // Detected clock drift
+  reason?: string;             // For denied results
+}
+</pre>
+    </section>
+
+    <section id="jitter-calculation-detailed">
+      <h3>Jitter Calculation</h3>
+      
+      <pre class="algorithm">
+function calculateSyncDelay(
+  ttl: number,                    // TTL in seconds
+  syncLeadTime: number = 0.8,     // Lead time fraction (0-1)
+  jitterPercent: number = 0.1     // Jitter as fraction of base delay
+): number {
+  const baseDelay = ttl * syncLeadTime;
+  const jitter = baseDelay * jitterPercent;
+  const randomJitter = (Math.random() * 2 - 1) * jitter;
+  return Math.max(0, baseDelay + randomJitter);
+}
+</pre>
+      
+      <p><strong>Example:</strong> TTL=86400 (24h), syncLeadTime=0.8 → baseDelay=69120s (19.2h). With jitterPercent=0.1, jitter range = ±6912s (±1.92h). Actual sync time = 19.2h ± up to 1.92h.</p>
+    </section>
+
+    <section id="exponential-backoff-detailed">
+      <h3>Randomized Truncated Exponential Backoff</h3>
+      
+      <pre class="algorithm">
+async function syncWithBackoff(
+  syncFn: () => Promise&lt;void&gt;,
+  maxAttempts: number = 5,
+  baseDelay: number = 1000,    // milliseconds
+  maxDelay: number = 60000      // milliseconds
+): Promise&lt;void&gt; {
+  for (let attempt = 0; attempt &lt; maxAttempts; attempt++) {
+    try {
+      return await syncFn();
+    } catch (err) {
+      if (attempt === maxAttempts - 1) throw err;
+      
+      const exponentialDelay = baseDelay * Math.pow(2, attempt);
+      const jitter = exponentialDelay * 0.1 * Math.random();
+      const backoffDelay = Math.min(maxDelay, exponentialDelay + jitter);
+      
+      await sleep(backoffDelay);
+    }
+  }
+}
+</pre>
+      
+      <p>Expected delays (baseDelay=1000ms, maxDelay=60000ms):</p>
+      <ul>
+        <li>Attempt 0: 900-1100 ms</li>
+        <li>Attempt 1: 1800-2200 ms</li>
+        <li>Attempt 2: 3600-4400 ms</li>
+        <li>Attempt 3: 7200-8800 ms</li>
+        <li>Attempt 4: 54000-60000 ms (capped by maxDelay)</li>
+      </ul>
+    </section>
+  </section>
+
+  <section id="security-considerations-detailed">
+    <h2>Security Considerations</h2>
+    
+    <p>This section provides detailed analysis of security threats and their mitigations. Implementers <em class="rfc2119">MUST</em> consider these threats when deploying Lease-CAP in production environments.</p>
+    
+    <section id="clock-skew-detailed">
+      <h3>Clock Skew and Synchronization</h3>
+      
+      <p><strong>Threat:</strong> Malicious or misconfigured verifiers use skewed clocks to prematurely expire capabilities or improperly extend STALE windows. An attacker with local admin rights rolls back the system clock to revive an EXPIRED capability.</p>
+      
+      <p><strong>Mitigation:</strong></p>
+      
+      <ol>
+        <li>Verifiers <em class="rfc2119">MUST</em> apply clock tolerance <code>ε</code> (RECOMMENDED: 5000 ms) symmetrically to the ACTIVE/STALE and STALE/EXPIRED boundaries.</li>
+        <li>Verifiers <em class="rfc2119">MUST</em> enforce future skew bound <code>Δ</code>, configurable per leaseSpec.</li>
+        <li>High-security verifiers <em class="rfc2119">MUST</em> use NTP-synchronized clocks with hardware-backed time sources (e.g., TPM, Secure Enclave).</li>
+        <li>Verifiers <em class="rfc2119">SHOULD</em> detect clock tampering by comparing NTP-synchronized time vs. local monotonic time; if divergence exceeds <code>2ε</code>, the verifier <em class="rfc2119">SHOULD</em> raise an alert and <em class="rfc2119">MAY</em> suspend verification.</li>
+        <li>Verifiers <em class="rfc2119">MUST</em> include their current timestamp in 403 Sync Required responses, enabling controllers to detect drift.</li>
+      </ol>
+    </section>
+
+    <section id="replay-attacks-detailed">
+      <h3>Replay Attacks</h3>
+      
+      <p><strong>Threat:</strong> Attacker replays old sync responses to extend capability lifetime beyond intended bounds.</p>
+      
+      <p><strong>Mitigation:</strong></p>
+      
+      <ol>
+        <li>Sync responses <em class="rfc2119">MUST</em> include strictly increasing <code>newLastSync</code> timestamps.</li>
+        <li>Sync responses <em class="rfc2119">MUST</em> include <code>previousLastSync</code> matching the controller's current state (subject to multi-device allowance).</li>
+        <li>Sync responses <em class="rfc2119">MUST</em> include a nonce matching the request nonce.</li>
+        <li>Verifiers and controllers <em class="rfc2119">MUST</em> reject any response where <code>newLastSync ≤ previousLastSync</code>.</li>
+        <li>Used nonces <em class="rfc2119">SHOULD</em> be stored for <code>TTL + GracePeriod</code> to detect replay within a single session.</li>
+        <li>Issuers <em class="rfc2119">MUST</em> remember previously issued <code>newLastSync</code> values for at least <code>TTL + GracePeriod</code>.</li>
+      </ol>
+    </section>
+
+    <section id="revocation-race-detailed">
+      <h3>Revocation Race Condition</h3>
+      
+      <p><strong>Threat:</strong> A capability is revoked, but the controller syncs successfully before the verifier learns of the revocation, receiving a valid-looking sync response.</p>
+      
+      <p><strong>Mitigation:</strong></p>
+      
+      <ol>
+        <li>Issuers <em class="rfc2119">MUST NOT</em> issue a successful <code>LeaseSyncResponse</code> for a revoked capability.</li>
+        <li>Issuers <em class="rfc2119">MUST</em> return <code>status: "revoked"</code> in sync responses for revoked capabilities.</li>
+        <li>Verifiers <em class="rfc2119">MUST</em> cache revocation proofs with <code>expiresAt = max(revokedAt + TTL + GracePeriod, lastSeenTimestamp + TTL + GracePeriod)</code>.</li>
+        <li>The maximum window for a revoked capability to remain usable is bounded by <code>TTL + GracePeriod</code>.</li>
+      </ol>
+    </section>
+
+    <section id="offline-mode-security-detailed">
+      <h3>Offline Mode Security</h3>
+      
+      <p><strong>Threat:</strong> Offline mode is abused to extend capability lifetime far beyond the intended window, or an attacker induces artificial network partitions to keep capabilities alive.</p>
+      
+      <p><strong>Mitigation:</strong></p>
+      
+      <ol>
+        <li>Offline mode <em class="rfc2119">MUST</em> be explicitly enabled by the issuer in <code>leaseSpec.offlineMode.enabled</code>.</li>
+        <li>Verifiers <em class="rfc2119">MUST</em> enforce <code>maxDurationSeconds</code> as a hard upper bound on total offline operation.</li>
+        <li><code>graceMultiplier</code> <em class="rfc2119">MUST NOT</em> exceed 2.0; issuers <em class="rfc2119">SHOULD</em> use the lowest effective value.</li>
+        <li>Offline grants <em class="rfc2119">MUST</em> produce audit log entries with an <code>offline_grant</code> action and remaining duration.</li>
+        <li>High-security deployments <em class="rfc2119">SHOULD</em> set <code>offlineMode.enabled: false</code>.</li>
+      </ol>
+      
+      <p>Formal offline expiry:</p>
+      
+      <pre>offlineExpiry = min(
+  lastSync + TTL + (GracePeriod × graceMultiplier),
+  lastSync + maxDurationSeconds
+)</pre>
+    </section>
+  </section>
+
+  <section id="privacy-considerations-detailed">
+    <h2>Privacy Considerations</h2>
+    
+    <p>This section analyzes privacy implications of Lease-CAP and provides mitigation strategies.</p>
+    
+    <section id="correlation-risk-detailed">
+      <h3>Correlation Risk</h3>
+      
+      <p>Each sync request reveals to the issuer that the controller is active and exercising a particular capability at a particular time. Over time, this creates a behavioral profile that could be used to track the controller.</p>
+      
+      <p><strong>Mitigation:</strong></p>
+      
+      <ol>
+        <li>Implement batch sync to reduce request frequency.</li>
+        <li>Use <code>nextSyncRecommended</code> to avoid predictable sync timing.</li>
+        <li>Deployments <em class="rfc2119">MAY</em> use BBS+ signatures for unlinkable proofs in high-privacy contexts.</li>
+        <li>Issuers <em class="rfc2119">SHOULD NOT</em> log sync request timestamps at granularity finer than the TTL interval.</li>
+      </ol>
+    </section>
+
+    <section id="batch-sync-detailed">
+      <h3>Batch Sync</h3>
+      
+      <p>Controllers <em class="rfc2119">SHOULD</em> use batch sync when managing multiple capabilities from the same issuer to reduce correlation:</p>
+      
+      <pre class="test-vector">
+{
+  "type": "BatchLeaseSyncRequest",
+  "capabilities": [
+    { 
+      "capabilityId": "urn:cap:abc123", 
+      "lastKnownSync": "2024-01-15T10:00:00Z", 
+      "nonce": "aaa-111" 
+    },
+    { 
+      "capabilityId": "urn:cap:def456", 
+      "lastKnownSync": "2024-01-15T10:00:00Z", 
+      "nonce": "bbb-222" 
+    }
+  ],
+  "proof": { ... }  // Single proof covering the entire batch request
+}
+</pre>
+      
+      <p>The issuer <em class="rfc2119">MUST</em> return individual <code>LeaseSyncResponse</code> objects for each capability within the batch. Each response carries its own <code>capabilityHash</code>, <code>nonce</code>, and proof. Batch sync verification follows Algorithm 11.3 applied independently to each response in the batch.</p>
+    </section>
+
+    <section id="data-minimization">
+      <h3>Data Minimization</h3>
+      
+      <p>Sync requests <em class="rfc2119">MUST NOT</em> contain unnecessary identifying information beyond what is required by Algorithm 11.3. Implementations <em class="rfc2119">SHOULD</em> strip request metadata (User-Agent, Referer headers) from sync HTTP requests.</p>
+    </section>
+  </section>
+
+  <section id="test-vectors-detailed">
+    <h2>Test Vectors</h2>
+    
+    <p>Each test vector specifies the full inputs (capability, lease state cache, reference time, controller DID) and the expected output. Implementations <em class="rfc2119">MUST</em> pass all vectors to claim conformance.</p>
+    
+    <div class="test-vector">
+      <h3>TV-01: ACTIVE State</h3>
+      <pre>{
+  "name": "TV-01: ACTIVE — should grant access",
+  "capability": {
+    "id": "urn:cap:tv-01",
+    "issuanceDate": "2024-01-15T10:00:00Z",
+    "credentialSubject": {
+      "id": "did:key:controller-tv01",
+      "capability": { "leaseSpec": { "ttl": 86400, "gracePeriod": 300 } }
+    }
+  },
+  "leaseStateCache": {
+    "urn:cap:tv-01": {
+      "newLastSync": "2024-01-15T10:00:00Z",
+      "capabilityHash": "H(capability)",
+      "status": "active"
+    }
+  },
+  "controllerDid": "did:key:controller-tv01",
+  "now": "2024-01-15T15:00:00Z",
+  "expected": { "status": "ACTIVE", "result": "granted" }
+}</pre>
+      <p><strong>Note:</strong> <code>lastSync</code> is held in the <code>leaseStateCache</code> entry, not in <code>credentialSubject</code>. This is the correct structure for all test vectors.</p>
+    </div>
+
+    <div class="test-vector">
+      <h3>TV-02: STALE State</h3>
+      <pre>{
+  "name": "TV-02: STALE — TTL elapsed, within grace, should require sync",
+  "leaseStateCache": {
+    "urn:cap:tv-02": {
+      "newLastSync": "2024-01-15T10:00:00Z",
+      "status": "active"
+    }
+  },
+  "now": "2024-01-16T10:02:00Z",
+  "comment": "now = lastSync + 24h + 2min; TTL=86400s expired, GracePeriod=300s not yet elapsed",
+  "expected": { "status": "STALE", "result": "sync_required" }
+}</pre>
+    </div>
+
+    <div class="test-vector">
+      <h3>TV-03: EXPIRED State</h3>
+      <pre>{
+  "name": "TV-03: EXPIRED — TTL + GracePeriod elapsed, should deny",
+  "leaseStateCache": {
+    "urn:cap:tv-03": {
+      "newLastSync": "2024-01-15T10:00:00Z",
+      "status": "active"
+    }
+  },
+  "now": "2024-01-16T10:10:00Z",
+  "comment": "now = lastSync + 24h + 10min; TTL=86400s, GracePeriod=300s, both elapsed (with ε=5s)",
+  "expected": { "status": "EXPIRED", "result": "denied" }
+}</pre>
+    </div>
+
+    <div class="test-vector">
+      <h3>TV-04: FUTURE State</h3>
+      <pre>{
+  "name": "TV-04: FUTURE — lastSync set far in future, should deny",
+  "leaseStateCache": {
+    "urn:cap:tv-04": {
+      "newLastSync": "2030-01-15T10:00:00Z",
+      "status": "active"
+    }
+  },
+  "now": "2024-01-15T15:00:00Z",
+  "comment": "now < newLastSync − Δ; Δ=5000ms",
+  "expected": { "status": "FUTURE", "result": "denied" }
+}</pre>
+    </div>
+
+    <div class="test-vector">
+      <h3>TV-05: No Prior Sync (Initial State)</h3>
+      <pre>{
+  "name": "TV-05: No prior LeaseSyncResponse — initial state uses issuanceDate",
+  "capability": {
+    "id": "urn:cap:tv-05",
+    "issuanceDate": "2024-01-15T10:00:00Z",
+    "credentialSubject": {
+      "id": "did:key:controller-tv05",
+      "capability": { "leaseSpec": { "ttl": 86400, "gracePeriod": 300 } }
+    }
+  },
+  "leaseStateCache": {},
+  "now": "2024-01-15T12:00:00Z",
+  "comment": "issuanceDate used as lastSync; now is 2h after issuance, well within TTL=24h",
+  "expected": { "status": "ACTIVE", "result": "granted" }
+}</pre>
+    </div>
+  </section>
+
+  <section id="acknowledgments-detailed">
+    <h2>Acknowledgments</h2>
+    
+    <p>This specification builds on work from:</p>
+    
+    <ul>
+      <li><strong>W3C Verifiable Credentials Data Model 2.0</strong> — credential structure and proof formats</li>
+      <li><strong>W3C DID Core 1.0</strong> — decentralized identifier resolution</li>
+      <li><strong>W3C Data Integrity 1.0</strong> — cryptographic proof framework</li>
+      <li><strong>UCAN (User Controlled Authorization Networks)</strong> — capability delegation patterns</li>
+      <li><strong>ZCAP-LD</strong> — authorization capabilities for linked data</li>
+      <li><strong>DIDComm Messaging</strong> — agent-to-agent communication</li>
+      <li><strong>RFC 2119 / RFC 8174</strong> — key word conventions</li>
+      <li><strong>RFC 8785</strong> — JSON Canonicalization Scheme</li>
+    </ul>
+    
+    <p>Special thanks to reviewers who identified critical gaps in state separation, cryptographic binding, revocation race conditions, multi-device sync handling, offline mode constraints, and DIDComm integration requirements.</p>
+  </section>
+
+  <section id="appendix-a-comparison">
+    <h2>Appendix A: Comparison with UCAN and ZCAP-LD</h2>
+    
+    <table class="comparison-table">
+      <thead>
+        <tr><th>Feature</th><th>UCAN</th><th>ZCAP-LD</th><th>Lease-CAP</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Delegation</td><td>Yes (hash chains)</td><td>Yes (proof chains)</td><td>Yes (with attenuation rule)</td></tr>
+        <tr><td>Expiry</td><td>Optional</td><td>No</td><td>Mandatory</td></tr>
+        <tr><td>Revocation</td><td>No</td><td>No</td><td>Yes (bounded by T+G)</td></tr>
+        <tr><td>Liveness guarantee</td><td>No</td><td>No</td><td>Yes</td></tr>
+        <tr><td>Offline operation</td><td>Yes (unbounded)</td><td>Yes (unbounded)</td><td>Yes (bounded, opt-in)</td></tr>
+        <tr><td>Temporal freshness</td><td>No</td><td>No</td><td>Yes</td></tr>
+        <tr><td>State separation (credential vs. lease)</td><td>No</td><td>No</td><td>Yes</td></tr>
+        <tr><td>Cryptographic binding (hash)</td><td>No</td><td>No</td><td>Yes</td></tr>
+        <tr><td>Multi-device sync</td><td>Implicit</td><td>Implicit</td><td>Explicitly specified</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="appendix-b-jsonld-context">
+    <h2>Appendix B: JSON-LD Context</h2>
+    
+    <pre class="test-vector">
+{
+  "@context": {
+    "@version": 1.1,
+    "@protected": true,
+    "LeaseCapability": "https://w3id.org/lease-cap#LeaseCapability",
+    "LeaseSyncRequest": "https://w3id.org/lease-cap#LeaseSyncRequest",
+    "LeaseSyncResponse": "https://w3id.org/lease-cap#LeaseSyncResponse",
+    "capabilityId": "https://w3id.org/lease-cap#capabilityId",
+    "capabilityHash": "https://w3id.org/lease-cap#capabilityHash",
+    "previousLastSync": "https://w3id.org/lease-cap#previousLastSync",
+    "newLastSync": "https://w3id.org/lease-cap#newLastSync",
+    "nextSyncRecommended": "https://w3id.org/lease-cap#nextSyncRecommended",
+    "ttl": "https://w3id.org/lease-cap#ttl",
+    "gracePeriod": "https://w3id.org/lease-cap#gracePeriod",
+    "futureSkewBound": "https://w3id.org/lease-cap#futureSkewBound",
+    "offlineMode": "https://w3id.org/lease-cap#offlineMode",
+    "maxDurationSeconds": "https://w3id.org/lease-cap#maxDurationSeconds",
+    "graceMultiplier": "https://w3id.org/lease-cap#graceMultiplier",
+    "verifierTimestamp": "https://w3id.org/lease-cap#verifierTimestamp",
+    "syncEndpoint": "https://w3id.org/lease-cap#syncEndpoint",
+    "syncMethod": "https://w3id.org/lease-cap#syncMethod",
+    "VerifiableCredential": "https://www.w3.org/2018/credentials#VerifiableCredential",
+    "DataIntegrityProof": "https://w3id.org/security#DataIntegrityProof"
+  }
+}
+</pre>
+    
+    <p><strong>Note:</strong> <code>lastSync</code> is intentionally absent from this context. It is not a field in any conforming Lease-CAP document; <code>newLastSync</code> in <code>LeaseSyncResponse</code> objects is the canonical form.</p>
+  </section>
+
+  <section id="appendix-c-changes">
+    <h2>Appendix C: Summary of Changes from Version 1.0</h2>
+    
+    <table class="parameter-table">
+      <thead>
+        <tr><th>Section</th><th>Change</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>§3.2 State Definitions</td><td>State boundaries made strictly non-overlapping; ε is a tolerance, not a state region</td></tr>
+        <tr><td>§6.1 State Separation</td><td>Strengthened prohibition on embedding lastSync in VC; rationale added</td></tr>
+        <tr><td>§7.1 Capability Credential</td><td>Removed lastSync from capability credential data model</td></tr>
+        <tr><td>§7.7 Revocation Cache</td><td>expiresAt formula corrected to max(revokedAt + TTL + GracePeriod, lastSeenTimestamp + TTL + GracePeriod)</td></tr>
+        <tr><td>§7.8 Offline Mode</td><td>Offline mode configuration (offlineMode object) added to leaseSpec data model</td></tr>
+        <tr><td>§9.5 Multi-Device Sync</td><td>Multi-device sync flow added</td></tr>
+        <tr><td>§11.3 Algorithm 11.3</td><td>Step 4 now specifies multi-device handling explicitly</td></tr>
+        <tr><td>§11.4 Algorithm 11.4</td><td>New Algorithm 11.4: VerifyDelegationChain (full chain)</td></tr>
+        <tr><td>§15.10 Offline Mode Security</td><td>Offline mode security formalized with explicit maxDurationSeconds enforcement</td></tr>
+        <tr><td>§19 Test Vectors</td><td>Test vectors corrected: lastSync in cache only, not in credential body</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="appendix-d-glossary">
+    <h2>Appendix D: Glossary</h2>
+    
+    <dl>
+      <dt><dfn>ACTIVE State</dfn></dt>
+      <dd>The capability is within its TTL window and can be used without issuer contact.</dd>
+      
+      <dt><dfn>Capability</dfn></dt>
+      <dd>A verifiable assertion of authorization to perform specific actions on a specific resource.</dd>
+      
+      <dt><dfn>Capability Hash</dfn></dt>
+      <dd>A SHA-256 hash of the canonicalized capability credential, used to bind lease state to a specific credential.</dd>
+      
+      <dt><dfn>Controller</dfn></dt>
+      <dd>The entity that holds and exercises a capability.</dd>
+      
+      <dt><dfn>Delegation Chain</dfn></dt>
+      <dd>A sequence of capabilities where each capability is delegated from the previous one.</dd>
+      
+      <dt><dfn>Effective Lease State</dfn></dt>
+      <dd>The current validity state derived from the latest valid LeaseSyncResponse.</dd>
+      
+      <dt><dfn>EXPIRED State</dfn></dt>
+      <dd>The capability has exceeded both TTL and GracePeriod; it cannot be used or renewed.</dd>
+      
+      <dt><dfn>FUTURE State</dfn></dt>
+      <dd>The lastSync timestamp is too far in the future relative to the verifier's clock.</dd>
+      
+      <dt><dfn>GracePeriod</dfn></dt>
+      <dd>The duration after TTL expiration during which sync can still succeed.</dd>
+      
+      <dt><dfn>Issuer</dfn></dt>
+      <dd>The entity that creates and signs capability credentials and sync responses.</dd>
+      
+      <dt><dfn>LastSync</dfn></dt>
+      <dd>The timestamp of the most recent successful synchronization, from a LeaseSyncResponse.</dd>
+      
+      <dt><dfn>Lease</dfn></dt>
+      <dd>The temporal validity period defined by TTL and GracePeriod.</dd>
+      
+      <dt><dfn>Lease Attenuation</dfn></dt>
+      <dd>The principle that delegated capabilities cannot outlive their parent's absolute expiration.</dd>
+      
+      <dt><dfn>Liveness-Bound Capability (LBC)</dfn></dt>
+      <dd>A capability whose validity requires periodic synchronization with the issuer.</dd>
+      
+      <dt><dfn>Liveness Guarantee</dfn></dt>
+      <dd>The property that a capability remains valid only while the controller successfully synchronizes within bounded intervals.</dd>
+      
+      <dt><dfn>Offline Mode</dfn></dt>
+      <dd>An optional mode where verifiers grant access even when the issuer is unreachable, within bounded limits.</dd>
+      
+      <dt><dfn>REVOKED State</dfn></dt>
+      <dd>The issuer has explicitly revoked the capability; it cannot be used.</dd>
+      
+      <dt><dfn>STALE State</dfn></dt>
+      <dd>The TTL has expired but the capability is within the grace period; sync is required before access.</dd>
+      
+      <dt><dfn>Sync</dfn></dt>
+      <dd>The process of the controller contacting the issuer to update the lease state.</dd>
+      
+      <dt><dfn>TTL (Time-To-Live)</dfn></dt>
+      <dd>The duration that a capability remains ACTIVE after lastSync.</dd>
+      
+      <dt><dfn>Verifier</dfn></dt>
+      <dd>The entity that checks capability validity before granting resource access.</dd>
+    </dl>
+  </section>
+
+  <section id="index" class="appendix"></section>
+</body>
+</html>
