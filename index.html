@@ -533,13 +533,13 @@
         <dt><dfn>Effective Lease State</dfn></dt>
         <dd>The current validity state (ACTIVE, STALE, EXPIRED, FUTURE, REVOKED, or INVALID) derived from the latest valid <code>LeaseSyncResponse</code> and the current time.</dd>
         
-        <dt><dfn>Controller</dfn></dt>
+        <dt>Controller</dt>
         <dd>The entity that holds a capability and exercises it to access resources. Controllers are responsible for maintaining liveness through synchronization.</dd>
         
-        <dt><dfn>Issuer</dfn></dt>
+        <dt>Issuer</dt>
         <dd>The entity that creates and signs the capability credential and sync responses. Issuers manage lease state and enforce revocation.</dd>
         
-        <dt><dfn>Verifier</dfn></dt>
+        <dt>Verifier</dt>
         <dd>The entity that checks capability validity before granting resource access. Verifiers evaluate lease state, check revocation, and enforce temporal bounds.</dd>
         
         <dt><dfn>Liveness Guarantee</dfn></dt>
@@ -624,7 +624,7 @@
       <p>Note that liveness is distinct from safety: a capability could be safe (not usable by unauthorized parties) but not live (the authorized controller cannot use it due to sync failures). The STALE state is specifically designed to trade off liveness against safety during network partitions.</p>
     </section>
 
-    <section id="liveness-guarantee">
+    <section id="liveness-guarantee-2">
       <h3>Liveness Guarantee</h3>
       
       <p><strong>Theorem (Liveness Guarantee):</strong> For any capability that has not been revoked, there exists a bounded time window <code>[lastSync, lastSync + T + G]</code> during which a controller who can successfully synchronize will be granted access. Outside this window, the capability is EXPIRED regardless of controller intent.</p>
@@ -653,16 +653,16 @@
         </thead>
         <tbody>
           <tr>
-            <td><strong>Safety</strong> (no unauthorized access)
-            <td>Unauthorized parties cannot access protected resources
-            <td>Revocation + cryptographic expiry + proof verification
-            <td>Absolute: access requires valid proofs and non-expired state
+            <td><strong>Safety</strong> (no unauthorized access)</td>
+            <td>Unauthorized parties cannot access protected resources</td>
+            <td>Revocation + cryptographic expiry + proof verification</td>
+            <td>Absolute: access requires valid proofs and non-expired state</td>
           </tr>
           <tr>
-            <td><strong>Liveness</strong> (authorized access eventually possible)
-            <td>Authorized controllers can eventually gain access
-            <td>Sync protocol + STALE grace period
-            <td>Temporary: depends on network connectivity and issuer availability
+            <td><strong>Liveness</strong> (authorized access eventually possible)</td>
+            <td>Authorized controllers can eventually gain access</td>
+            <td>Sync protocol + STALE grace period</td>
+            <td>Temporary: depends on network connectivity and issuer availability</td>
           </tr>
         </tbody>
       </table>
@@ -822,7 +822,7 @@
       </div>
     </section>
 
-    <section id="effective-lease-state">
+    <section id="effective-lease-state-2">
       <h3>Effective Lease State</h3>
       
       <p>The <dfn>Effective Lease State</dfn> of a capability is determined by the latest valid <code>LeaseSyncResponse</code> in the lease state cache:</p>
@@ -849,7 +849,7 @@
       </ul>
     </section>
 
-    <section id="cryptographic-binding">
+    <section id="cryptographic-binding-2">
       <h3>Cryptographic Binding Between Credential and Lease State</h3>
       
       <p>To prevent substitution attacks — where an attacker presents a valid lease state for a different capability with the same ID — each <code>LeaseSyncResponse</code> <em class="rfc2119">MUST</em> include a hash of the original capability credential:</p>
@@ -879,7 +879,7 @@
       <p>The <code>capabilityHash</code> prevents this by ensuring each sync response is cryptographically bound to a specific credential. Since the hash includes the controller DID and all other fields, any change to the credential results in a different hash, causing verification to fail.</p>
     </section>
 
-    <section id="lease-attenuation">
+    <section id="lease-attenuation-2">
       <h3>Lease Attenuation and Delegation</h3>
       
       <p>Capability delegation is a powerful feature of capability-based systems. Lease-CAP supports delegation with the important constraint of <strong>lease attenuation</strong>: a delegated capability cannot have a longer effective lifetime than its parent.</p>
@@ -903,7 +903,7 @@
       </ul>
     </section>
 
-    <section id="synchronization-bound-authority">
+    <section id="synchronization-bound-authority-2">
       <h3>Synchronization-Bound Authority</h3>
       
       <p>Lease-CAP's fundamental contribution is that <strong>authority decays unless actively maintained</strong>. This represents a paradigm shift from static to dynamic authorization. To understand why this matters, consider the differences:</p>
@@ -931,7 +931,7 @@
       </ol>
     </section>
 
-    <section id="future-state-protection">
+    <section id="future-state-protection-2">
       <h3>Future State Protection</h3>
       
       <p>To prevent attacks where an issuer or replay sets <code>newLastSync</code> far in the future — effectively bypassing expiration — verifiers <em class="rfc2119">MUST</em> enforce a maximum future skew bound <code>Δ</code>. If <code>N &lt; L − Δ</code>, the capability <em class="rfc2119">MUST</em> be treated as FUTURE and rejected.</p>
@@ -957,7 +957,7 @@
       <p>When not specified, <code>Δ</code> defaults to 5000 ms (5 seconds).</p>
     </section>
 
-    <section id="temporal-coupling">
+    <section id="temporal-coupling-2">
       <h3>Temporal Coupling Across Delegation Chains</h3>
       
       <p>During verification of a delegation chain, each capability in the chain <em class="rfc2119">MUST</em> be evaluated at the same reference time <code>N</code>. If any capability in the chain resolves to STALE or EXPIRED, the entire chain <em class="rfc2119">MUST</em> be treated as invalid for the purpose of granting access, unless the controller performs sync and retries.</p>
@@ -1199,7 +1199,7 @@
     </section>
   </section>
 
-  <section id="state-machine-detailed">
+  <section id="state-machine">
     <h2>State Machine</h2>
     
     <p>The capability state machine defines how capabilities transition between states over time and in response to events. Understanding these transitions is essential for implementing correct verifiers and controllers.</p>
@@ -1221,67 +1221,67 @@
         </thead>
         <tbody>
           <tr>
-            <td>NONE (not yet issued)</th>
-            <td>ISSUE</th>
-            <td>ACTIVE</th>
-            <td>Valid issuer signature; initial <code>lastSync</code> = <code>issuanceDate</code></th>
-            <td>Issuer creates and signs capability credential</th>
+            <td>NONE (not yet issued)</td>
+            <td>ISSUE</td>
+            <td>ACTIVE</td>
+            <td>Valid issuer signature; initial <code>lastSync</code> = <code>issuanceDate</code></td>
+            <td>Issuer creates and signs capability credential</td>
           </tr>
           <tr>
-            <td>ACTIVE</th>
-            <td>TIME_ADVANCE</th>
-            <td>STALE</th>
-            <td><code>N > L + T + ε</code> (TTL expired, within grace)</th>
-            <td>24 hours after last sync, capability becomes stale</th>
+            <td>ACTIVE</td>
+            <td>TIME_ADVANCE</td>
+            <td>STALE</td>
+            <td><code>N > L + T + ε</code> (TTL expired, within grace)</td>
+            <td>24 hours after last sync, capability becomes stale</td>
           </tr>
           <tr>
-            <td>ACTIVE</th>
-            <td>SYNC_SUCCESS</th>
-            <td>ACTIVE</th>
-            <td>Valid sync response received; <code>lastSync</code> updated</th>
-            <td>Controller syncs before TTL expires</th>
+            <td>ACTIVE</td>
+            <td>SYNC_SUCCESS</td>
+            <td>ACTIVE</td>
+            <td>Valid sync response received; <code>lastSync</code> updated</td>
+            <td>Controller syncs before TTL expires</td>
           </tr>
           <tr>
-            <td>ACTIVE</th>
-            <td>REVOKE</th>
-            <td>REVOKED</th>
-            <td>Valid revocation proof received</th>
-            <td>Issuer revokes capability</th>
+            <td>ACTIVE</td>
+            <td>REVOKE</td>
+            <td>REVOKED</td>
+            <td>Valid revocation proof received</td>
+            <td>Issuer revokes capability</td>
           </tr>
           <tr>
-            <td>STALE</th>
-            <td>SYNC_SUCCESS</th>
-            <td>ACTIVE</th>
-            <td>Valid sync response received within grace period</th>
-            <td>Controller syncs after TTL expires but before grace ends</th>
+            <td>STALE</td>
+            <td>SYNC_SUCCESS</td>
+            <td>ACTIVE</td>
+            <td>Valid sync response received within grace period</td>
+            <td>Controller syncs after TTL expires but before grace ends</td>
           </tr>
           <tr>
-            <td>STALE</th>
-            <td>TIME_ADVANCE</th>
-            <td>EXPIRED</th>
-            <td><code>N > L + T + G + ε</code> (grace period elapsed)</th>
-            <td>5 minutes after STALE, capability expires</th>
+            <td>STALE</td>
+            <td>TIME_ADVANCE</td>
+            <td>EXPIRED</td>
+            <td><code>N > L + T + G + ε</code> (grace period elapsed)</td>
+            <td>5 minutes after STALE, capability expires</td>
           </tr>
           <tr>
-            <td>EXPIRED</th>
-            <td>RE_ISSUE</th>
-            <td>ACTIVE</th>
-            <td>New capability credential issued by issuer</th>
-            <td>Issuer issues new capability with fresh issuance date</th>
+            <td>EXPIRED</td>
+            <td>RE_ISSUE</td>
+            <td>ACTIVE</td>
+            <td>New capability credential issued by issuer</td>
+            <td>Issuer issues new capability with fresh issuance date</td>
           </tr>
           <tr>
-            <td>ANY</th>
-            <td>FUTURE_DETECT</th>
-            <td>FUTURE</th>
-            <td><code>N &lt; L − Δ</code> (lastSync too far in future)</th>
-            <td>Verifier detects timestamp in future beyond Δ</th>
+            <td>ANY</td>
+            <td>FUTURE_DETECT</td>
+            <td>FUTURE</td>
+            <td><code>N &lt; L − Δ</code> (lastSync too far in future)</td>
+            <td>Verifier detects timestamp in future beyond Δ</td>
           </tr>
           <tr>
-            <td>REVOKED</th>
-            <td>—</th>
-            <td>REVOKED</th>
-            <td>Terminal state</th>
-            <td>No further transitions; re-issuance required</th>
+            <td>REVOKED</td>
+            <td>—</td>
+            <td>REVOKED</td>
+            <td>Terminal state</td>
+            <td>No further transitions; re-issuance required</td>
           </tr>
         </tbody>
       </table>
@@ -1339,7 +1339,7 @@
     </section>
   </section>
 
-  <section id="protocol-flows-detailed">
+  <section id="protocol-flows">
     <h2>Protocol Flows</h2>
     
     <p>The protocol flows illustrate the interactions between Controllers, Verifiers, and Issuers in various scenarios. All messages are cryptographically signed and include appropriate proofs.</p>
@@ -1550,22 +1550,22 @@ Device A          Device B          Issuer
         </thead>
         <tbody>
           <tr>
-            <td><code>capabilityDelegation</code></th>
-            <td>Issuer</th>
-            <td>Capability credential at issuance</th>
-            <td>When creating a new capability</th>
+            <td><code>capabilityDelegation</code></td>
+            <td>Issuer</td>
+            <td>Capability credential at issuance</td>
+            <td>When creating a new capability</td>
           </tr>
           <tr>
-            <td><code>capabilityInvocation</code></th>
-            <td>Controller</th>
-            <td>Sync request; resource access request (if signed)</th>
-            <td>When requesting sync or accessing resources</th>
+            <td><code>capabilityInvocation</code></td>
+            <td>Controller</td>
+            <td>Sync request; resource access request (if signed)</td>
+            <td>When requesting sync or accessing resources</td>
           </tr>
           <tr>
-            <td><code>capabilityAssertion</code></th>
-            <td>Issuer</th>
-            <td><code>LeaseSyncResponse</code>; revocation notices</th>
-            <td>When responding to sync requests or revoking capabilities</th>
+            <td><code>capabilityAssertion</code></td>
+            <td>Issuer</td>
+            <td><code>LeaseSyncResponse</code>; revocation notices</td>
+            <td>When responding to sync requests or revoking capabilities</td>
           </tr>
         </tbody>
       </table>
@@ -1647,7 +1647,7 @@ async function verifyProof(
     </section>
   </section>
 
-  <section id="verification-algorithms-detailed">
+  <section id="verification-algorithms">
     <h2>Verification Algorithms</h2>
     
     <p>This section defines the core verification algorithms that all conforming verifiers <em class="rfc2119">MUST</em> implement. These algorithms are referenced throughout the specification.</p>
@@ -1880,19 +1880,19 @@ async function verifyProof(
         </thead>
         <tbody>
           <tr>
-            <td><code>AsyncGraceMultiplier</code></th>
-            <td>1.5</th>
-            <td>Extended grace for async response delivery (applies to message latency, not capability grace)</th>
+            <td><code>AsyncGraceMultiplier</code></td>
+            <td>1.5</td>
+            <td>Extended grace for async response delivery (applies to message latency, not capability grace)</td>
           </tr>
           <tr>
-            <td><code>MaxAsyncLatency</code></th>
-            <td>30000 ms</th>
-            <td>Maximum expected round-trip time for DIDComm messages</th>
+            <td><code>MaxAsyncLatency</code></td>
+            <td>30000 ms</td>
+            <td>Maximum expected round-trip time for DIDComm messages</td>
           </tr>
           <tr>
-            <td><code>RetryBackoffBase</code></th>
-            <td>2000 ms</th>
-            <td>Base delay for async retries</th>
+            <td><code>RetryBackoffBase</code></td>
+            <td>2000 ms</td>
+            <td>Base delay for async retries</td>
           </tr>
         </tbody>
       </table>
@@ -1966,7 +1966,7 @@ async function verifyProof(
     </section>
   </section>
 
-  <section id="implementation-guidance-detailed">
+  <section id="implementation-guidance">
     <h2>Implementation Guidance</h2>
     
     <p>This section provides practical guidance for implementers, including parameter selection, sync strategies, and error handling.</p>
@@ -1991,54 +1991,54 @@ async function verifyProof(
         </thead>
         <tbody>
           <tr>
-            <td>High-frequency API</th>
-            <td>3600 s (1 hour)</th>
-            <td>60 s</th>
-            <td>0.8</th>
-            <td>10%</th>
-            <td>7 days</th>
-            <td>Disabled</th>
-            <td>5 s</th>
+            <td>High-frequency API</td>
+            <td>3600 s (1 hour)</td>
+            <td>60 s</td>
+            <td>0.8</td>
+            <td>10%</td>
+            <td>7 days</td>
+            <td>Disabled</td>
+            <td>5 s</td>
           </tr>
           <tr>
-            <td>Web application</th>
-            <td>86400 s (24 hours)</th>
-            <td>300 s (5 minutes)</th>
-            <td>0.8</th>
-            <td>10%</th>
-            <td>30 days</th>
-            <td>Optional</th>
-            <td>5 s</th>
+            <td>Web application</td>
+            <td>86400 s (24 hours)</td>
+            <td>300 s (5 minutes)</td>
+            <td>0.8</td>
+            <td>10%</td>
+            <td>30 days</td>
+            <td>Optional</td>
+            <td>5 s</td>
           </tr>
           <tr>
-            <td>Financial transactions</th>
-            <td>7200 s (2 hours)</th>
-            <td>120 s</th>
-            <td>0.7</th>
-            <td>5%</th>
-            <td>14 days</th>
-            <td>Disabled</th>
-            <td>1 s</th>
+            <td>Financial transactions</td>
+            <td>7200 s (2 hours)</td>
+            <td>120 s</td>
+            <td>0.7</td>
+            <td>5%</td>
+            <td>14 days</td>
+            <td>Disabled</td>
+            <td>1 s</td>
           </tr>
           <tr>
-            <td>IoT devices</th>
-            <td>604800 s (7 days)</th>
-            <td>3600 s (1 hour)</th>
-            <td>0.7</th>
-            <td>15%</th>
-            <td>90 days</th>
-            <td>Enabled (1.5×)</th>
-            <td>30 s</th>
+            <td>IoT devices</td>
+            <td>604800 s (7 days)</td>
+            <td>3600 s (1 hour)</td>
+            <td>0.7</td>
+            <td>15%</td>
+            <td>90 days</td>
+            <td>Enabled (1.5×)</td>
+            <td>30 s</td>
           </tr>
           <tr>
-            <td>Satellite/cross-border</th>
-            <td>86400 s (24 hours)</th>
-            <td>600 s (10 minutes)</th>
-            <td>0.6</th>
-            <td>10%</th>
-            <td>60 days</th>
-            <td>Enabled (1.5×)</th>
-            <td>30 s</th>
+            <td>Satellite/cross-border</td>
+            <td>86400 s (24 hours)</td>
+            <td>600 s (10 minutes)</td>
+            <td>0.6</td>
+            <td>10%</td>
+            <td>60 days</td>
+            <td>Enabled (1.5×)</td>
+            <td>30 s</td>
           </tr>
         </tbody>
       </table>
@@ -2061,32 +2061,32 @@ async function verifyProof(
         </thead>
         <tbody>
           <tr>
-            <td>Proactive</th>
-            <td>Sync before TTL expires</th>
-            <td>Zero (no sync delay on access)</th>
-            <td>Medium (regular sync patterns)</th>
-            <td>Most use cases</th>
+            <td>Proactive</td>
+            <td>Sync before TTL expires</td>
+            <td>Zero (no sync delay on access)</td>
+            <td>Medium (regular sync patterns)</td>
+            <td>Most use cases</td>
           </tr>
           <tr>
-            <td>On-demand</th>
-            <td>Sync on STALE response from verifier</th>
-            <td>First request delayed</th>
-            <td>High (sync only when needed)</th>
-            <td>High-latency environments, privacy-sensitive</th>
+            <td>On-demand</td>
+            <td>Sync on STALE response from verifier</td>
+            <td>First request delayed</td>
+            <td>High (sync only when needed)</td>
+            <td>High-latency environments, privacy-sensitive</td>
           </tr>
           <tr>
-            <td>Hybrid</th>
-            <td>Proactive with on-demand fallback</th>
-            <td>Near-zero</th>
-            <td>Medium</th>
-            <td>Production systems</th>
+            <td>Hybrid</td>
+            <td>Proactive with on-demand fallback</td>
+            <td>Near-zero</td>
+            <td>Medium</td>
+            <td>Production systems</td>
           </tr>
           <tr>
-            <td>Batch</th>
-            <td>Multiple capabilities synced together</th>
-            <td>Zero (if scheduled proactively)</th>
-            <td>High (reduces correlation)</th>
-            <td>Many capabilities per controller</th>
+            <td>Batch</td>
+            <td>Multiple capabilities synced together</td>
+            <td>Zero (if scheduled proactively)</td>
+            <td>High (reduces correlation)</td>
+            <td>Many capabilities per controller</td>
           </tr>
         </tbody>
       </table>
@@ -2196,7 +2196,7 @@ async function syncWithBackoff(
     
     <p>This section provides detailed analysis of security threats and their mitigations. Implementers <em class="rfc2119">MUST</em> consider these threats when deploying Lease-CAP in production environments.</p>
     
-    <section id="clock-skew-detailed">
+    <section id="clock-skew">
       <h3>Clock Skew and Synchronization</h3>
       
       <p><strong>Threat:</strong> Malicious or misconfigured verifiers use skewed clocks to prematurely expire capabilities or improperly extend STALE windows. An attacker with local admin rights rolls back the system clock to revive an EXPIRED capability.</p>
@@ -2212,7 +2212,7 @@ async function syncWithBackoff(
       </ol>
     </section>
 
-    <section id="replay-attacks-detailed">
+    <section id="replay-attacks">
       <h3>Replay Attacks</h3>
       
       <p><strong>Threat:</strong> Attacker replays old sync responses to extend capability lifetime beyond intended bounds.</p>
@@ -2229,7 +2229,7 @@ async function syncWithBackoff(
       </ol>
     </section>
 
-    <section id="revocation-race-detailed">
+    <section id="revocation-race">
       <h3>Revocation Race Condition</h3>
       
       <p><strong>Threat:</strong> A capability is revoked, but the controller syncs successfully before the verifier learns of the revocation, receiving a valid-looking sync response.</p>
@@ -2244,7 +2244,7 @@ async function syncWithBackoff(
       </ol>
     </section>
 
-    <section id="offline-mode-security-detailed">
+    <section id="offline-mode-security">
       <h3>Offline Mode Security</h3>
       
       <p><strong>Threat:</strong> Offline mode is abused to extend capability lifetime far beyond the intended window, or an attacker induces artificial network partitions to keep capabilities alive.</p>
@@ -2265,6 +2265,24 @@ async function syncWithBackoff(
   lastSync + TTL + (GracePeriod × graceMultiplier),
   lastSync + maxDurationSeconds
 )</pre>
+    </section>
+    
+    <section id="denial-of-service">
+      <h3>Denial of Service</h3>
+      <p><strong>Threat:</strong> Attackers flood sync endpoints with requests to overwhelm issuers.</p>
+      <p><strong>Mitigation:</strong> Issuers <em class="rfc2119">MUST</em> implement rate limiting. Controllers <em class="rfc2119">MUST</em> implement truncated exponential backoff with jitter.</p>
+    </section>
+
+    <section id="key-compromise">
+      <h3>Key Compromise</h3>
+      <p><strong>Threat:</strong> An attacker steals a controller's private key and syncs capabilities indefinitely.</p>
+      <p><strong>Mitigation:</strong> The issuer can revoke the capability. The maximum window of abuse is bounded by <code>T + G</code> from the last legitimate sync before revocation.</p>
+    </section>
+
+    <section id="thundering-herd">
+      <h3>Thundering Herd</h3>
+      <p><strong>Threat:</strong> Many devices attempt to sync simultaneously, overwhelming the issuer.</p>
+      <p><strong>Mitigation:</strong> Controllers <em class="rfc2119">MUST</em> apply jitter to sync scheduling. Issuers <em class="rfc2119">MAY</em> provide a <code>nextSyncRecommended</code> field to distribute load.</p>
     </section>
   </section>
 
@@ -2530,13 +2548,13 @@ async function syncWithBackoff(
       <dt><dfn>Capability Hash</dfn></dt>
       <dd>A SHA-256 hash of the canonicalized capability credential, used to bind lease state to a specific credential.</dd>
       
-      <dt><dfn>Controller</dfn></dt>
+      <dt>Controller</dt>
       <dd>The entity that holds and exercises a capability.</dd>
       
       <dt><dfn>Delegation Chain</dfn></dt>
       <dd>A sequence of capabilities where each capability is delegated from the previous one.</dd>
       
-      <dt><dfn>Effective Lease State</dfn></dt>
+      <dt>Effective Lease State</dt>
       <dd>The current validity state derived from the latest valid LeaseSyncResponse.</dd>
       
       <dt><dfn>EXPIRED State</dfn></dt>
@@ -2545,25 +2563,25 @@ async function syncWithBackoff(
       <dt><dfn>FUTURE State</dfn></dt>
       <dd>The lastSync timestamp is too far in the future relative to the verifier's clock.</dd>
       
-      <dt><dfn>GracePeriod</dfn></dt>
+      <dt>GracePeriod</dt>
       <dd>The duration after TTL expiration during which sync can still succeed.</dd>
       
-      <dt><dfn>Issuer</dfn></dt>
+      <dt>Issuer</dt>
       <dd>The entity that creates and signs capability credentials and sync responses.</dd>
       
-      <dt><dfn>LastSync</dfn></dt>
+      <dt>LastSync</dt>
       <dd>The timestamp of the most recent successful synchronization, from a LeaseSyncResponse.</dd>
       
-      <dt><dfn>Lease</dfn></dt>
+      <dt>Lease</dt>
       <dd>The temporal validity period defined by TTL and GracePeriod.</dd>
       
       <dt><dfn>Lease Attenuation</dfn></dt>
       <dd>The principle that delegated capabilities cannot outlive their parent's absolute expiration.</dd>
       
-      <dt><dfn>Liveness-Bound Capability (LBC)</dfn></dt>
+      <dt>Liveness-Bound Capability (LBC)</dt>
       <dd>A capability whose validity requires periodic synchronization with the issuer.</dd>
       
-      <dt><dfn>Liveness Guarantee</dfn></dt>
+      <dt>Liveness Guarantee</dt>
       <dd>The property that a capability remains valid only while the controller successfully synchronizes within bounded intervals.</dd>
       
       <dt><dfn>Offline Mode</dfn></dt>
@@ -2578,10 +2596,10 @@ async function syncWithBackoff(
       <dt><dfn>Sync</dfn></dt>
       <dd>The process of the controller contacting the issuer to update the lease state.</dd>
       
-      <dt><dfn>TTL (Time-To-Live)</dfn></dt>
+      <dt>TTL (Time-To-Live)</dt>
       <dd>The duration that a capability remains ACTIVE after lastSync.</dd>
       
-      <dt><dfn>Verifier</dfn></dt>
+      <dt>Verifier</dt>
       <dd>The entity that checks capability validity before granting resource access.</dd>
     </dl>
   </section>
